@@ -51,7 +51,7 @@ export default function SignUpPage() {
 
       alert("Account created successfully!");
       router.push("/login");
-    } catch (err) {
+    } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -125,7 +125,8 @@ export default function SignUpPage() {
               <Image
                 src={showPassword ? hideIcon : showIcon}
                 alt="Toggle Password"
-                className="w-6 h-6"
+                width={24} // Tambahkan width
+                height={24} // Tambahkan height
               />
             </button>
           </div>
@@ -148,7 +149,8 @@ export default function SignUpPage() {
               <Image
                 src={showConfirmPassword ? hideIcon : showIcon}
                 alt="Toggle Confirm Password"
-                className="w-6 h-6"
+                width={24} // Tambahkan width
+                height={24} // Tambahkan height
               />
             </button>
           </div>
