@@ -10,6 +10,7 @@ import {
   FaUser,
 } from "react-icons/fa";
 import { IconType } from "react-icons";
+import Image from "next/image";
 
 // Interface untuk props NavItem
 interface NavItemProps {
@@ -36,7 +37,7 @@ export default function Dashboard() {
       {/* Sidebar Kiri */}
       <aside className="w-64 bg-black text-white p-6 flex flex-col space-y-6">
         <div className="flex items-center space-x-2">
-          <img src="/logo.png" alt="EOQ Logo" className="w-10" />
+          <Image src="/logo.png" alt="EOQ Logo" className="w-10" />
           <span className="text-xl font-bold">EOQ TRACK</span>
         </div>
         <nav className="flex flex-col space-y-4">

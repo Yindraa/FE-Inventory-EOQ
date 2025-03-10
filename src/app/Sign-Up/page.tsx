@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -45,13 +46,17 @@ export default function SignUpPage() {
         body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
+      const data: { message?: string } = await response.json();
       if (!response.ok) throw new Error(data.message || "Sign Up failed!");
 
       alert("Account created successfully!");
       router.push("/login");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred.");
+      }
     } finally {
       setLoading(false);
     }
@@ -117,7 +122,7 @@ export default function SignUpPage() {
               className="absolute right-2 top-8"
               onClick={() => setShowPassword(!showPassword)}
             >
-              <img
+              <Image
                 src={showPassword ? hideIcon : showIcon}
                 alt="Toggle Password"
                 className="w-6 h-6"
@@ -140,7 +145,7 @@ export default function SignUpPage() {
               className="absolute right-2 top-8"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
             >
-              <img
+              <Image
                 src={showConfirmPassword ? hideIcon : showIcon}
                 alt="Toggle Confirm Password"
                 className="w-6 h-6"

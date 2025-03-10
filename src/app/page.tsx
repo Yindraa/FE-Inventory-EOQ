@@ -264,7 +264,7 @@ export default function LoginPage() {
 
         {/* Tambahkan "Don't have an account?" */}
         <p className="text-center text-sm text-gray-600 mt-4">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <button
             onClick={() => router.push("/Sign-Up")}
             className="text-blue-500 hover:underline"
