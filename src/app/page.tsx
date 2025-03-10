@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { IconType } from "react-icons";
 import { FaUser, FaLock } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
+import Image from "next/image";
 
 interface InputProps {
   type: string;
@@ -47,21 +48,20 @@ export default function LoginPage() {
   const [emailReset, setEmailReset] = useState("");
   const [loading, setLoading] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [loadingReset, setLoadingReset] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
 
-    if (typeof window !== "undefined") {
-      const savedUsername = localStorage.getItem("rememberedUsername");
-      const token = localStorage.getItem("token");
-      if (savedUsername) {
-        setUsername(savedUsername);
-        setRememberMe(true);
-      }
-      if (token) {
-        router.push("/dashboard");
-      }
-    }
+    if (typeof window === "undefined") return;
+
+    const savedUsername = localStorage.getItem("rememberedUsername") || "";
+    const token = localStorage.getItem("token");
+
+    setUsername(savedUsername);
+    setRememberMe(!!savedUsername);
+
+    if (token) router.push("/Dashboard");
   }, [router]);
 
   const handleLogin = useCallback(
@@ -70,6 +70,13 @@ export default function LoginPage() {
       setError("");
       setLoading(true);
 
+      // Validasi input sebelum request
+      if (!username.trim() || !password.trim()) {
+        setError("Username and password cannot be empty.");
+        setLoading(false);
+        return;
+      }
+
       try {
         const response = await fetch(`${API_URL}/auth/login`, {
           method: "POST",
@@ -77,8 +84,12 @@ export default function LoginPage() {
           body: JSON.stringify({ username, password }),
         });
 
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Login failed!");
+        }
+
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || "Login failed!");
 
         if (typeof window !== "undefined") {
           localStorage.setItem("token", data.token);
@@ -90,9 +101,13 @@ export default function LoginPage() {
         }
 
         alert("Login successful!");
-        router.push("/dashboard");
-      } catch (err: any) {
-        setError(err.message);
+        router.push("/Dashboard");
+      } catch (err) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("An unexpected error occurred.");
+        }
       } finally {
         setLoading(false);
       }
@@ -105,6 +120,9 @@ export default function LoginPage() {
       setError("Please enter your email.");
       return;
     }
+
+    setLoadingReset(true);
+    setError("");
 
     try {
       const response = await fetch(`${API_URL}/auth/reset-password`, {
@@ -119,21 +137,39 @@ export default function LoginPage() {
       alert("Reset link sent to your email.");
       setForgotPassword(false);
       setEmailReset("");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An error occurred while resetting the password.");
+      }
+    } finally {
+      setLoadingReset(false);
     }
   };
 
-  const handleGoogleLogin = () => {
-    window.location.href = `${API_URL}/auth/google`;
-  };
+  const handleGoogleLogin = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.location.href = `${API_URL}/auth/google`;
+    }
+  }, []);
 
   return (
     <div
       className="flex flex-col h-screen items-center justify-center bg-cover bg-center"
-      style={isClient ? { backgroundImage: "url('/background.jpg')" } : {}}
+      style={
+        isClient ? { backgroundImage: "url('/Image/LOGIN PAGE.png')" } : {}
+      }
     >
-      {isClient && <img src="/logo.png" alt="EOQ Logo" className="w-24 mb-4" />}
+      {isClient && (
+        <Image
+          src="/Image/EOQ TRACK LOGO 1.png"
+          alt="EOQ Logo"
+          width={96}
+          height={96}
+          priority
+        />
+      )}
 
       <div className="bg-white shadow-2xl rounded-lg p-8 w-[400px] text-black">
         <h2 className="text-center text-2xl font-semibold mb-6">
@@ -153,14 +189,16 @@ export default function LoginPage() {
             />
             <button
               onClick={handleForgotPassword}
-              className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700"
+              className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loadingReset}
             >
-              Send Reset Link
+              {loadingReset ? "Sending..." : "Send Reset Link"}
             </button>
             <button
               type="button"
               className="w-full text-sm text-gray-600 hover:underline"
               onClick={() => setForgotPassword(false)}
+              disabled={loadingReset} // Cegah interaksi saat loading
             >
               Back to Login
             </button>
