@@ -11,21 +11,19 @@ import {
 } from "react-icons/fa";
 import { IconType } from "react-icons";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 
-// Interface untuk props NavItem
 interface NavItemProps {
   icon: IconType;
   text: string;
 }
 
-// Interface untuk props StatCard
 interface StatCardProps {
   title: string;
   value: string | number;
   change: "positive" | "negative";
 }
 
-// Interface untuk data Top Selling Products
 interface ProductSale {
   product: string;
   sale: number;
@@ -37,7 +35,7 @@ export default function Dashboard() {
       {/* Sidebar Kiri */}
       <aside className="w-64 bg-black text-white p-6 flex flex-col space-y-6">
         <div className="flex items-center space-x-2">
-          <Image src="/logo.png" alt="EOQ Logo" className="w-10" />
+          <Image src="/logo.png" alt="EOQ Logo" width={40} height={40} />
           <span className="text-xl font-bold">EOQ TRACK</span>
         </div>
         <nav className="flex flex-col space-y-4">
@@ -52,7 +50,7 @@ export default function Dashboard() {
       {/* Konten Utama */}
       <main className="flex-1 p-6">
         <h1 className="text-2xl font-bold">Welcome, De Carlito</h1>
-        <p className="text-gray-500">3 March 2025</p>
+        <p className="text-gray-500">{new Date().toLocaleDateString()}</p>
 
         {/* Statistik */}
         <div className="grid grid-cols-3 gap-6 my-6">
@@ -69,7 +67,7 @@ export default function Dashboard() {
       </main>
 
       {/* Sidebar Kanan */}
-      <aside className="w-72 bg-gray-900 text-white p-6 flex flex-col space-y-4">
+      <aside className="w-72 bg-gray-800 text-white p-6 flex flex-col space-y-4">
         <div className="flex items-center space-x-4">
           <FaUser className="text-2xl" />
           <span className="text-lg">De Carlito</span>
@@ -79,7 +77,7 @@ export default function Dashboard() {
           <input
             type="text"
             placeholder="Search..."
-            className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-800 text-white focus:outline-none"
+            className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-700 text-white focus:outline-none"
           />
         </div>
         <TopSellingProducts />
@@ -88,15 +86,22 @@ export default function Dashboard() {
   );
 }
 
-// Komponen NavItem dengan tipe props yang sesuai
-const NavItem: React.FC<NavItemProps> = ({ icon: Icon, text }) => (
-  <button className="flex items-center space-x-2 p-2 hover:bg-gray-700 rounded-lg">
-    <Icon className="text-xl" />
-    <span>{text}</span>
-  </button>
-);
+const NavItem: React.FC<NavItemProps> = ({ icon: Icon, text }) => {
+  const pathname = usePathname();
+  const isActive = pathname.includes(text.toLowerCase());
 
-// Komponen StatCard dengan tipe props yang sesuai
+  return (
+    <button
+      className={`flex items-center space-x-2 p-2 rounded-lg ${
+        isActive ? "bg-gray-700" : "hover:bg-gray-700"
+      }`}
+    >
+      <Icon className="text-xl" />
+      <span>{text}</span>
+    </button>
+  );
+};
+
 const StatCard: React.FC<StatCardProps> = ({ title, value, change }) => (
   <div
     className={`p-4 rounded-lg shadow-lg ${
@@ -108,7 +113,25 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, change }) => (
   </div>
 );
 
-// Komponen OrderTable untuk menampilkan tabel pesanan terbaru
+const orders = [
+  {
+    id: "12563987563",
+    date: "18/07/2023",
+    product: "Dolan Watch",
+    customer: "Allan Wood",
+    price: "$1,349",
+    status: "On Process",
+  },
+  {
+    id: "12563987564",
+    date: "19/07/2023",
+    product: "Sisy Bag",
+    customer: "Jane Doe",
+    price: "$849",
+    status: "Delivered",
+  },
+];
+
 const OrderTable: React.FC = () => (
   <table className="w-full text-left">
     <thead>
@@ -122,19 +145,20 @@ const OrderTable: React.FC = () => (
       </tr>
     </thead>
     <tbody>
-      <tr>
-        <td className="p-2">12563987563</td>
-        <td className="p-2">18/7/2023</td>
-        <td className="p-2">Dolan Watch</td>
-        <td className="p-2">Allan Wood</td>
-        <td className="p-2">$1,349</td>
-        <td className="p-2">On Process</td>
-      </tr>
+      {orders.map((order, index) => (
+        <tr key={index}>
+          <td className="p-2">{order.id}</td>
+          <td className="p-2">{order.date}</td>
+          <td className="p-2">{order.product}</td>
+          <td className="p-2">{order.customer}</td>
+          <td className="p-2">{order.price}</td>
+          <td className="p-2">{order.status}</td>
+        </tr>
+      ))}
     </tbody>
   </table>
 );
 
-// Komponen TopSellingProducts dengan tipe data yang jelas
 const TopSellingProducts: React.FC = () => {
   const products: ProductSale[] = [
     { product: "Dolan Watch", sale: 365 },

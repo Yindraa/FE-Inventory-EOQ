@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -19,10 +19,6 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // URL atau path gambar untuk ikon show/hide password
-  const showIcon = "/images/show.png"; // Ganti dengan URL gambar sendiri
-  const hideIcon = "/images/hide.png"; // Ganti dengan URL gambar sendiri
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -67,12 +63,10 @@ export default function SignUpPage() {
       className="flex flex-col h-screen items-center justify-center relative bg-cover bg-center"
       style={{ backgroundImage: "url('/Image/SIGN UP.png')" }}
     >
-      {/* Lingkaran Dekoratif */}
       <div className="absolute inset-0 flex justify-center items-center">
         <div className="w-full h-full bg-black opacity-60"></div>
       </div>
 
-      {/* Card Form */}
       <div className="relative bg-white shadow-2xl rounded-lg p-8 w-[400px] text-black">
         <h2 className="text-center text-2xl font-semibold mb-6">
           CREATE ACCOUNT
@@ -119,15 +113,10 @@ export default function SignUpPage() {
             />
             <button
               type="button"
-              className="absolute right-2 top-8"
+              className="absolute right-2 top-8 text-gray-500"
               onClick={() => setShowPassword(!showPassword)}
             >
-              <Image
-                src={showPassword ? hideIcon : showIcon}
-                alt="Toggle Password"
-                width={24} // Tambahkan width
-                height={24} // Tambahkan height
-              />
+              {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
             </button>
           </div>
 
@@ -143,15 +132,14 @@ export default function SignUpPage() {
             />
             <button
               type="button"
-              className="absolute right-2 top-8"
+              className="absolute right-2 top-8 text-gray-500"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
             >
-              <Image
-                src={showConfirmPassword ? hideIcon : showIcon}
-                alt="Toggle Confirm Password"
-                width={24} // Tambahkan width
-                height={24} // Tambahkan height
-              />
+              {showConfirmPassword ? (
+                <FaEyeSlash size={20} />
+              ) : (
+                <FaEye size={20} />
+              )}
             </button>
           </div>
 
