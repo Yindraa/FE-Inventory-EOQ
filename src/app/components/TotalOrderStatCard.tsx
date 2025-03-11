@@ -88,7 +88,8 @@ const TotalOrderStatCard: React.FC = () => {
         label: "Orders",
         data: orderTrend,
         borderColor: isPositive ? "#16A34A" : "#DC2626",
-        backgroundColor: (context: any) => getGradientFill(context),
+        backgroundColor: (context: { chart: ChartJS }) =>
+          getGradientFill(context),
         fill: true,
         tension: 0.4,
       },

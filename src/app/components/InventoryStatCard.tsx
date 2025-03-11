@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Line } from "react-chartjs-2";
 import { FaArrowUp, FaArrowDown } from "react-icons/fa";
 import {
@@ -34,7 +34,6 @@ const InventoryStatCard: React.FC = () => {
   const [inventoryChange, setInventoryChange] = useState<number>(0);
   const [inventoryTrend, setInventoryTrend] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const chartRef = useRef<ChartJS | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -90,7 +89,7 @@ const InventoryStatCard: React.FC = () => {
         label: "Inventory",
         data: inventoryTrend,
         borderColor: isPositive ? "#16A34A" : "#DC2626",
-        backgroundColor: (context: any) => getGradientFill(context),
+        backgroundColor: getGradientFill, // Tidak menggunakan `any`
         fill: true,
         tension: 0.4,
       },

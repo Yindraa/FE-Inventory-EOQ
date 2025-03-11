@@ -243,6 +243,14 @@ export default function LoginPage() {
             </button>
           </form>
         )}
+
+        {/* Tombol Login dengan Google */}
+        {!forgotPassword && (
+          <button className="flex items-center space-x-2 border p-2 rounded-lg w-full justify-center mt-4">
+            <FcGoogle size={20} />
+            <span>Login with Google</span>
+          </button>
+        )}
       </div>
     </div>
   );
