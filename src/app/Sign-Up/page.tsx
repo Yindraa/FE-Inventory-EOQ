@@ -39,20 +39,24 @@ export default function SignUpPage() {
       const response = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+        }),
       });
 
-      const data: { message?: string } = await response.json();
-      if (!response.ok) throw new Error(data.message || "Sign Up failed!");
+      const data: { message?: string; success?: boolean } =
+        await response.json();
+      if (!response.ok || !data.success)
+        throw new Error(data.message || "Sign Up failed!");
 
-      alert("Account created successfully!");
-      router.push("/login");
+      alert("Account created successfully! You can now log in.");
+      router.push("/");
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unknown error occurred.");
-      }
+      setError(
+        err instanceof Error ? err.message : "An unknown error occurred."
+      );
     } finally {
       setLoading(false);
     }
@@ -151,6 +155,14 @@ export default function SignUpPage() {
             {loading ? "Signing Up..." : "SIGN UP"}
           </button>
         </form>
+
+        {/* Teks Already have an account? Login */}
+        <p className="text-center text-sm text-gray-600 mt-4">
+          Already have an account?{" "}
+          <a href="/" className="text-blue-500 hover:underline">
+            Login
+          </a>
+        </p>
       </div>
     </div>
   );
