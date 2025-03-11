@@ -70,7 +70,6 @@ export default function LoginPage() {
       setError("");
       setLoading(true);
 
-      // Validasi input sebelum request
       if (!username.trim() || !password.trim()) {
         setError("Username and password cannot be empty.");
         setLoading(false);
@@ -115,154 +114,89 @@ export default function LoginPage() {
     [username, password, rememberMe, router]
   );
 
-  const handleForgotPassword = async () => {
-    if (!emailReset) {
-      setError("Please enter your email.");
-      return;
-    }
-
-    setLoadingReset(true);
-    setError("");
-
-    try {
-      const response = await fetch(`${API_URL}/auth/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailReset }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "Reset failed!");
-
-      alert("Reset link sent to your email.");
-      setForgotPassword(false);
-      setEmailReset("");
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An error occurred while resetting the password.");
-      }
-    } finally {
-      setLoadingReset(false);
-    }
-  };
-
-  const handleGoogleLogin = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.location.href = `${API_URL}/auth/google`;
-    }
-  }, []);
-
   return (
     <div
-      className="flex flex-col h-screen items-center justify-center bg-cover bg-center"
+      className="relative flex flex-col h-screen items-center justify-center bg-cover bg-center"
       style={
         isClient ? { backgroundImage: "url('/Image/LOGIN PAGE.png')" } : {}
       }
     >
       {isClient && (
-        <Image
-          src="/Image/EOQ TRACK LOGO 1.png"
-          alt="EOQ Logo"
-          width={96}
-          height={96}
-          priority
-        />
+        <div className="absolute top-[8%]">
+          <Image
+            src="/Image/EOQ TRACK LOGO 1.png"
+            alt="EOQ Logo"
+            width={96}
+            height={96}
+            priority
+          />
+        </div>
       )}
 
-      <div className="bg-white shadow-2xl rounded-lg p-8 w-[400px] text-black">
+      {/* Container Login */}
+      <div className="bg-white shadow-2xl rounded-lg p-8 w-[400px] text-black mt-20">
         <h2 className="text-center text-2xl font-semibold mb-6">
           {forgotPassword ? "RESET PASSWORD" : "USER LOGIN"}
         </h2>
 
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
-        {forgotPassword ? (
-          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
-            <InputField
-              type="email"
-              placeholder="Enter your email"
-              Icon={FaUser}
-              value={emailReset}
-              onChange={(e) => setEmailReset(e.target.value)}
-            />
-            <button
-              onClick={handleForgotPassword}
-              className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loadingReset}
-            >
-              {loadingReset ? "Sending..." : "Send Reset Link"}
-            </button>
-            <button
-              type="button"
-              className="w-full text-sm text-gray-600 hover:underline"
-              onClick={() => setForgotPassword(false)}
-              disabled={loadingReset} // Cegah interaksi saat loading
-            >
-              Back to Login
-            </button>
-          </form>
-        ) : (
-          <form className="space-y-4" onSubmit={handleLogin}>
-            <InputField
-              type="text"
-              placeholder="Username"
-              Icon={FaUser}
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            <InputField
-              type="password"
-              placeholder="Password"
-              Icon={FaLock}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <div className="flex justify-between items-center text-sm">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={() => setRememberMe(!rememberMe)}
-                  className="accent-gray-600"
-                />
-                <span>Remember me</span>
-              </label>
-              <button
-                type="button"
-                className="hover:underline text-blue-500"
-                onClick={() => setForgotPassword(true)}
-              >
-                Forgot password?
-              </button>
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700"
-              disabled={loading}
-            >
-              {loading ? "Logging in..." : "Login"}
-            </button>
-
-            <div className="flex items-center justify-center my-2">
-              <div className="border-t w-1/4"></div>
-              <span className="mx-2 text-sm text-gray-600">OR</span>
-              <div className="border-t w-1/4"></div>
-            </div>
-
+        <form className="space-y-4" onSubmit={handleLogin}>
+          <InputField
+            type="text"
+            placeholder="Username"
+            Icon={FaUser}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <InputField
+            type="password"
+            placeholder="Password"
+            Icon={FaLock}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <div className="flex justify-between items-center text-sm">
+            <label className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={() => setRememberMe(!rememberMe)}
+                className="accent-gray-600"
+              />
+              <span>Remember me</span>
+            </label>
             <button
               type="button"
-              onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center border py-2 rounded-lg hover:bg-gray-100"
+              className="hover:underline text-blue-500"
+              onClick={() => setForgotPassword(true)}
             >
-              <FcGoogle className="mr-2 text-xl" />
-              Continue with Google
+              Forgot password?
             </button>
-          </form>
-        )}
+          </div>
+          <button
+            type="submit"
+            className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700"
+            disabled={loading}
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
 
-        {/* Tambahkan "Don't have an account?" */}
+          <div className="flex items-center justify-center my-2">
+            <div className="border-t w-1/4"></div>
+            <span className="mx-2 text-sm text-gray-600">OR</span>
+            <div className="border-t w-1/4"></div>
+          </div>
+
+          <button
+            type="button"
+            className="w-full flex items-center justify-center border py-2 rounded-lg hover:bg-gray-100"
+          >
+            <FcGoogle className="mr-2 text-xl" />
+            Continue with Google
+          </button>
+        </form>
+
         <p className="text-center text-sm text-gray-600 mt-4">
           Don&apos;t have an account?{" "}
           <button
