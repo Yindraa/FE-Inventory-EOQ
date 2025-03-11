@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { IconType } from "react-icons";
-import { FaUser, FaLock } from "react-icons/fa";
+import { FaUser, FaLock, FaEnvelope } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 import Image from "next/image";
 
@@ -47,8 +47,9 @@ export default function LoginPage() {
   const [forgotPassword, setForgotPassword] = useState(false);
   const [emailReset, setEmailReset] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isClient, setIsClient] = useState(false);
   const [loadingReset, setLoadingReset] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     setIsClient(true);
@@ -114,6 +115,36 @@ export default function LoginPage() {
     [username, password, rememberMe, router]
   );
 
+  const handleForgotPassword = async () => {
+    if (!emailReset.trim()) {
+      setError("Please enter your email.");
+      return;
+    }
+
+    setLoadingReset(true);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      const response = await fetch(`${API_URL}/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailReset }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send reset email.");
+      }
+
+      setSuccessMessage("Password reset email sent! Check your inbox.");
+      setEmailReset("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLoadingReset(false);
+    }
+  };
+
   return (
     <div
       className="relative flex flex-col h-screen items-center justify-center bg-cover bg-center"
@@ -133,79 +164,85 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* Container Login */}
+      {/* Container Login / Reset Password */}
       <div className="bg-white shadow-2xl rounded-lg p-8 w-[400px] text-black mt-20">
         <h2 className="text-center text-2xl font-semibold mb-6">
           {forgotPassword ? "RESET PASSWORD" : "USER LOGIN"}
         </h2>
 
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+        {successMessage && (
+          <p className="text-green-500 text-sm text-center">{successMessage}</p>
+        )}
 
-        <form className="space-y-4" onSubmit={handleLogin}>
-          <InputField
-            type="text"
-            placeholder="Username"
-            Icon={FaUser}
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <InputField
-            type="password"
-            placeholder="Password"
-            Icon={FaLock}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <div className="flex justify-between items-center text-sm">
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={() => setRememberMe(!rememberMe)}
-                className="accent-gray-600"
-              />
-              <span>Remember me</span>
-            </label>
+        {forgotPassword ? (
+          // Form Reset Password
+          <div className="space-y-4">
+            <InputField
+              type="email"
+              placeholder="Enter your email"
+              Icon={FaEnvelope}
+              value={emailReset}
+              onChange={(e) => setEmailReset(e.target.value)}
+            />
             <button
-              type="button"
-              className="hover:underline text-blue-500"
-              onClick={() => setForgotPassword(true)}
+              onClick={handleForgotPassword}
+              className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700"
+              disabled={loadingReset}
             >
-              Forgot password?
+              {loadingReset ? "Sending..." : "Send Reset Link"}
+            </button>
+            <button
+              onClick={() => setForgotPassword(false)}
+              className="w-full text-gray-600 hover:underline text-center"
+            >
+              Back to login
             </button>
           </div>
-          <button
-            type="submit"
-            className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700"
-            disabled={loading}
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
-
-          <div className="flex items-center justify-center my-2">
-            <div className="border-t w-1/4"></div>
-            <span className="mx-2 text-sm text-gray-600">OR</span>
-            <div className="border-t w-1/4"></div>
-          </div>
-
-          <button
-            type="button"
-            className="w-full flex items-center justify-center border py-2 rounded-lg hover:bg-gray-100"
-          >
-            <FcGoogle className="mr-2 text-xl" />
-            Continue with Google
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-600 mt-4">
-          Don&apos;t have an account?{" "}
-          <button
-            onClick={() => router.push("/Sign-Up")}
-            className="text-blue-500 hover:underline"
-          >
-            Sign up
-          </button>
-        </p>
+        ) : (
+          // Form Login
+          <form className="space-y-4" onSubmit={handleLogin}>
+            <InputField
+              type="text"
+              placeholder="Username"
+              Icon={FaUser}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <InputField
+              type="password"
+              placeholder="Password"
+              Icon={FaLock}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <div className="flex justify-between items-center text-sm">
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={() => setRememberMe(!rememberMe)}
+                  className="accent-gray-600"
+                />
+                <span>Remember me</span>
+              </label>
+              <button
+                type="button"
+                className="hover:underline text-blue-500"
+                onClick={() => setForgotPassword(true)}
+              >
+                Forgot password?
+              </button>
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700"
+              disabled={loading}
+            >
+              {loading ? "Logging in..." : "Login"}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

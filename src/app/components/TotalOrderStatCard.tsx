@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import axios, { AxiosResponse } from "axios";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import { Line } from "react-chartjs-2";
 import { FaArrowUp, FaArrowDown } from "react-icons/fa";
 import {
@@ -27,28 +27,27 @@ ChartJS.register(
 );
 
 interface OrderStats {
-  totalOrders: number | null;
-  percentageChange: number | null;
-  orderTrend: number[] | null;
+  totalOrders: number;
+  percentageChange: number;
+  orderTrend: number[];
 }
 
 const TotalOrderStatCard: React.FC = () => {
-  const [totalOrders, setTotalOrders] = useState<number | null>(null);
-  const [percentageChange, setPercentageChange] = useState<number | null>(null);
-  const [orderTrend, setOrderTrend] = useState<number[] | null>(null);
+  const [totalOrders, setTotalOrders] = useState<number>(0);
+  const [percentageChange, setPercentageChange] = useState<number>(0);
+  const [orderTrend, setOrderTrend] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const chartRef = useRef<any>(null); // Ref untuk akses canvas
 
   useEffect(() => {
     axios
       .get<OrderStats>("https://api.example.com/orders/statistics")
-      .then((response: AxiosResponse<OrderStats>) => {
+      .then((response) => {
         const data = response.data;
-        setTotalOrders(data.totalOrders ?? null);
-        setPercentageChange(data.percentageChange ?? null);
-        setOrderTrend(data.orderTrend?.length ? data.orderTrend : null);
+        setTotalOrders(data.totalOrders);
+        setPercentageChange(data.percentageChange);
+        setOrderTrend(data.orderTrend);
       })
-      .catch((error: unknown) => {
+      .catch((error) => {
         console.error("Error fetching data:", error);
       })
       .finally(() => setIsLoading(false));
@@ -62,7 +61,7 @@ const TotalOrderStatCard: React.FC = () => {
     );
   }
 
-  const isPositive = (percentageChange ?? 0) >= 0;
+  const isPositive = percentageChange >= 0;
   const arrowIcon = isPositive ? (
     <FaArrowUp className="text-green-500" />
   ) : (
@@ -71,11 +70,7 @@ const TotalOrderStatCard: React.FC = () => {
   const textColor = isPositive ? "text-green-600" : "text-red-600";
 
   // Fungsi untuk membuat gradient transparan pada grafik
-  const getGradientFill = (context: any) => {
-    const chart = chartRef.current;
-    if (!chart)
-      return isPositive ? "rgba(16, 185, 129, 0.2)" : "rgba(220, 38, 38, 0.2)";
-
+  const getGradientFill = (context: { chart: ChartJS }) => {
     const ctx = context.chart.ctx;
     const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
     gradient.addColorStop(
@@ -83,16 +78,15 @@ const TotalOrderStatCard: React.FC = () => {
       isPositive ? "rgba(16, 185, 129, 0.6)" : "rgba(220, 38, 38, 0.6)"
     );
     gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
-
     return gradient;
   };
 
   const chartData = {
-    labels: orderTrend ? orderTrend.map((_, i) => `Month ${i + 1}`) : [],
+    labels: orderTrend.map((_, i) => `Month ${i + 1}`),
     datasets: [
       {
         label: "Orders",
-        data: orderTrend ?? [],
+        data: orderTrend,
         borderColor: isPositive ? "#16A34A" : "#DC2626",
         backgroundColor: (context: any) => getGradientFill(context),
         fill: true,
@@ -106,9 +100,7 @@ const TotalOrderStatCard: React.FC = () => {
     maintainAspectRatio: false,
     scales: { x: { display: false }, y: { display: false } },
     elements: { point: { radius: 0 } },
-    plugins: {
-      legend: { display: false }, // Sembunyikan kotak hijau (legend)
-    },
+    plugins: { legend: { display: false } },
   };
 
   return (
@@ -117,24 +109,20 @@ const TotalOrderStatCard: React.FC = () => {
 
       {/* Warna Total Orders Sesuai Data */}
       <p className={`text-3xl font-bold ${textColor}`}>
-        {totalOrders !== null
-          ? totalOrders.toLocaleString()
-          : "No data available"}
+        {totalOrders.toLocaleString()}
       </p>
 
       <p className={`flex items-center space-x-1 ${textColor}`}>
         {arrowIcon}
         <span className="text-xl font-semibold">
-          {percentageChange !== null
-            ? `${percentageChange}%`
-            : "No data available"}
+          {percentageChange.toFixed(2)}%
         </span>
       </p>
       <p className="text-gray-500 text-sm">vs last month</p>
 
       <div className="h-20 mt-2">
-        {orderTrend && orderTrend.length > 0 ? (
-          <Line ref={chartRef} data={chartData} options={chartOptions} />
+        {orderTrend.length > 0 ? (
+          <Line data={chartData} options={chartOptions} />
         ) : (
           <p className="text-gray-500">No data available</p>
         )}

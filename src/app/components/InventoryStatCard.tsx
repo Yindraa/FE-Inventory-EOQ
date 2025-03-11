@@ -26,24 +26,25 @@ ChartJS.register(
 );
 
 interface InventoryStats {
-  inventoryChange: number | null;
-  inventoryTrend: number[] | null;
+  inventoryChange: number;
+  inventoryTrend: number[];
 }
 
 const InventoryStatCard: React.FC = () => {
-  const [inventoryChange, setInventoryChange] = useState<number | null>(null);
-  const [inventoryTrend, setInventoryTrend] = useState<number[] | null>(null);
+  const [inventoryChange, setInventoryChange] = useState<number>(0);
+  const [inventoryTrend, setInventoryTrend] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const chartRef = useRef<any>(null); // Ref untuk akses canvas
+  const chartRef = useRef<ChartJS | null>(null);
 
   useEffect(() => {
-    // Ambil data dari API backend (gunakan fetch atau axios)
     const fetchData = async () => {
       try {
-        const response = await fetch("/api/inventory"); // Ganti dengan endpoint backend
+        const response = await fetch("/api/inventory");
+        if (!response.ok) throw new Error("Failed to fetch inventory data");
+
         const data: InventoryStats = await response.json();
-        setInventoryChange(data.inventoryChange);
-        setInventoryTrend(data.inventoryTrend);
+        setInventoryChange(data.inventoryChange ?? 0);
+        setInventoryTrend(data.inventoryTrend ?? []);
       } catch (error) {
         console.error("Error fetching inventory data:", error);
       } finally {
@@ -62,7 +63,7 @@ const InventoryStatCard: React.FC = () => {
     );
   }
 
-  const isPositive = (inventoryChange ?? 0) >= 0;
+  const isPositive = inventoryChange >= 0;
   const arrowIcon = isPositive ? (
     <FaArrowUp className="text-green-500" />
   ) : (
@@ -70,31 +71,24 @@ const InventoryStatCard: React.FC = () => {
   );
   const textColor = isPositive ? "text-green-600" : "text-red-600";
 
-  // Fungsi untuk membuat gradient fill pada grafik
-  const getGradientFill = (context: any) => {
-    const chart = chartRef.current;
-    if (!chart)
-      return isPositive ? "rgba(16, 185, 129, 0.2)" : "rgba(220, 38, 38, 0.2)";
-
+  const getGradientFill = (context: { chart: ChartJS }) => {
     const ctx = context.chart.ctx;
     const gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
     gradient.addColorStop(
       0,
       isPositive ? "rgba(16, 185, 129, 0.6)" : "rgba(220, 38, 38, 0.6)"
     );
-    gradient.addColorStop(1, "rgba(255, 255, 255, 0)"); // Fade-out ke transparan
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
 
     return gradient;
   };
 
   const chartData = {
-    labels: inventoryTrend
-      ? inventoryTrend.map((_, i) => `Month ${i + 1}`)
-      : [],
+    labels: inventoryTrend.map((_, i) => `Month ${i + 1}`),
     datasets: [
       {
         label: "Inventory",
-        data: inventoryTrend ?? [],
+        data: inventoryTrend,
         borderColor: isPositive ? "#16A34A" : "#DC2626",
         backgroundColor: (context: any) => getGradientFill(context),
         fill: true,
@@ -108,9 +102,7 @@ const InventoryStatCard: React.FC = () => {
     maintainAspectRatio: false,
     scales: { x: { display: false }, y: { display: false } },
     elements: { point: { radius: 0 } },
-    plugins: {
-      legend: { display: false }, // Sembunyikan kotak hijau label
-    },
+    plugins: { legend: { display: false } },
   };
 
   return (
@@ -119,16 +111,14 @@ const InventoryStatCard: React.FC = () => {
       <p className={`flex items-center space-x-1 ${textColor}`}>
         {arrowIcon}
         <span className="text-xl font-semibold">
-          {inventoryChange !== null
-            ? `${Math.abs(inventoryChange)}%`
-            : "No data available"}
+          {Math.abs(inventoryChange)}%
         </span>
       </p>
       <p className="text-gray-500 text-sm">vs last month</p>
 
       <div className="h-20 mt-2">
-        {inventoryTrend && inventoryTrend.length > 0 ? (
-          <Line ref={chartRef} data={chartData} options={chartOptions} />
+        {inventoryTrend.length > 0 ? (
+          <Line data={chartData} options={chartOptions} />
         ) : (
           <p className="text-gray-500">No data available</p>
         )}
