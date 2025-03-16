@@ -57,7 +57,6 @@ const NavItem: React.FC<NavItemProps> = ({
 const LeftSidebar: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
-  const isHomeActive = pathname === "/" || pathname.includes("dashboard");
 
   return (
     <aside className="w-64 bg-black text-white p-6 flex flex-col space-y-6">
