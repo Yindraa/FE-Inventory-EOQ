@@ -75,38 +75,38 @@ const LeftSidebar: React.FC = () => {
         <NavItem
           icon={FaHome}
           text="Home"
-          isActive={isHomeActive}
+          isActive={pathname.includes("Dashboard")}
           onClick={() => router.push("/Dashboard")}
         />
         <NavItem
           icon={FaBox}
           text="Product"
-          isActive={pathname.includes("product")}
-          onClick={() => router.push("/product")}
+          isActive={pathname.includes("Product")}
+          onClick={() => router.push("/Product")}
         />
         <NavItem
           icon={FaShippingFast}
           text="Order"
-          isActive={pathname.includes("order")}
-          onClick={() => router.push("/order")}
+          isActive={pathname.includes("Order")}
+          onClick={() => router.push("/Order")}
         />
         <NavItem
           icon={FaTruckMoving}
           text="Shipping"
-          isActive={pathname.includes("shipping")}
-          onClick={() => router.push("/shipping")}
+          isActive={pathname.includes("Shipping")}
+          onClick={() => router.push("/Shipping")}
         />
         <NavItem
           icon={FaChartLine}
           text="EOQ"
-          isActive={pathname.includes("eoq")}
-          onClick={() => router.push("/eoq")}
+          isActive={pathname.includes("EOQ")}
+          onClick={() => router.push("/EOQ")}
         />
         <NavItem
           icon={FaSignOutAlt}
           text="Log Out"
           isActive={false}
-          onClick={() => router.push("/logout")}
+          onClick={() => router.push("/Logout")}
         />
       </nav>
     </aside>
