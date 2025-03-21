@@ -11,99 +11,78 @@ import {
   Paper,
   TextField,
   IconButton,
-  Checkbox,
   Button,
   Modal,
   Box,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
-import { FaTrash } from "react-icons/fa"; // ✅ Import ikon tempat sampah
 import axios from "axios";
 import LeftSidebar from "../components/LeftSidebar";
 
-interface Product {
+interface Order {
   id: number;
+  date: string;
   product: string;
-  sku: string;
-  location: string;
-  price: number;
-  stock: number;
-  checked?: boolean;
+  customer: string;
+  totalPrice: number;
+  status: string;
 }
 
-export default function ProductPage() {
-  const [data, setData] = useState<Product[]>([]);
+export default function OrderPage() {
+  const [data, setData] = useState<Order[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [openModal, setOpenModal] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(
-    null
-  );
-  const [selectAll, setSelectAll] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Partial<Order> | null>(null);
 
   useEffect(() => {
-    fetchProducts();
+    fetchOrders();
   }, []);
 
-  // Ambil data dari backend
-  const fetchProducts = async () => {
+  // Ambil data order dari backend
+  const fetchOrders = async () => {
     try {
-      const response = await axios.get("/api/products");
-      setData(
-        response.data.map((item: Product) => ({ ...item, checked: false }))
-      );
+      const response = await axios.get("/api/orders");
+      setData(response.data);
     } catch (error) {
-      console.error("Error fetching products:", error);
+      console.error("Error fetching orders:", error);
     }
-  };
-
-  const handleDelete = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) {
-      return; // Jika pengguna membatalkan, hentikan proses
-    }
-
-    try {
-      await axios.delete(`/api/products/${id}`);
-      fetchProducts(); // Refresh tabel setelah delete
-    } catch (error) {
-      console.error("Error deleting product:", error);
-    }
-  };
-
-  const handleSelectAll = () => {
-    const newCheckedStatus = !selectAll;
-    setSelectAll(newCheckedStatus);
-    setData((prevData) =>
-      prevData.map((item) => ({ ...item, checked: newCheckedStatus }))
-    );
-  };
-
-  const handleSelectItem = (id: number) => {
-    const updatedData = data.map((item) =>
-      item.id === id ? { ...item, checked: !item.checked } : item
-    );
-    setSelectAll(updatedData.every((item) => item.checked));
-    setData(updatedData);
   };
 
   const handleAddOrEdit = async () => {
     try {
-      if (editingProduct?.id) {
-        await axios.put(`/api/products/${editingProduct.id}`, editingProduct);
+      if (editingOrder?.id) {
+        // Edit order
+        await axios.put(`/api/orders/${editingOrder.id}`, editingOrder);
       } else {
-        await axios.post("/api/products", editingProduct);
+        // Tambah order baru
+        await axios.post("/api/orders", editingOrder);
       }
       setOpenModal(false);
-      fetchProducts(); // Refresh data setelah perubahan
+      fetchOrders(); // Refresh data setelah perubahan
     } catch (error) {
-      console.error("Error saving product:", error);
+      console.error("Error saving order:", error);
     }
   };
 
-  const handleEditClick = (product: Product) => {
-    setEditingProduct(product);
+  const handleEditClick = (order: Order) => {
+    setEditingOrder(order);
     setOpenModal(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await axios.delete(`/api/orders/${id}`);
+      fetchOrders(); // Refresh data setelah menghapus
+    } catch (error) {
+      console.error("Error deleting order:", error);
+    }
   };
 
   const filteredData = data.filter((row) =>
@@ -131,7 +110,7 @@ export default function ProductPage() {
             color: "#333",
           }}
         >
-          List Product
+          Order History
         </h2>
         <Paper
           sx={{
@@ -162,47 +141,44 @@ export default function ProductPage() {
               sx={{ bgcolor: "#292929", color: "white" }}
               startIcon={<AddIcon />}
               onClick={() => {
-                setEditingProduct(null);
+                setEditingOrder({
+                  date: "",
+                  product: "",
+                  customer: "",
+                  totalPrice: 0,
+                  status: "",
+                });
                 setOpenModal(true);
               }}
             >
-              Add Item
+              Add Order
             </Button>
           </div>
         </Paper>
 
-        {/* TABEL PRODUK */}
+        {/* TABEL ORDER */}
         <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
           <Table>
             <TableHead>
               <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-                <TableCell>
-                  <Checkbox checked={selectAll} onChange={handleSelectAll} />
-                </TableCell>
-                <TableCell>No ID</TableCell>
+                <TableCell>Order ID</TableCell>
+                <TableCell>Date</TableCell>
                 <TableCell>Product</TableCell>
-                <TableCell>SKU</TableCell>
-                <TableCell>Location</TableCell>
-                <TableCell>Price</TableCell>
-                <TableCell>Stock</TableCell>
+                <TableCell>Customer</TableCell>
+                <TableCell>Total Price</TableCell>
+                <TableCell>Status</TableCell>
                 <TableCell>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredData.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={row.checked}
-                      onChange={() => handleSelectItem(row.id)}
-                    />
-                  </TableCell>
                   <TableCell>{row.id}</TableCell>
+                  <TableCell>{row.date}</TableCell>
                   <TableCell>{row.product}</TableCell>
-                  <TableCell>{row.sku}</TableCell>
-                  <TableCell>{row.location}</TableCell>
-                  <TableCell>{row.price}</TableCell>
-                  <TableCell>{row.stock}</TableCell>
+                  <TableCell>{row.customer}</TableCell>
+                  <TableCell>{row.totalPrice}</TableCell>
+                  <TableCell>{row.status}</TableCell>
                   <TableCell>
                     <IconButton
                       sx={{ color: "black" }}
@@ -214,7 +190,7 @@ export default function ProductPage() {
                       sx={{ color: "red" }}
                       onClick={() => handleDelete(row.id)}
                     >
-                      <FaTrash />
+                      <DeleteIcon />
                     </IconButton>
                   </TableCell>
                 </TableRow>
@@ -223,7 +199,7 @@ export default function ProductPage() {
           </Table>
         </TableContainer>
 
-        {/* MODAL ADD/EDIT ITEM */}
+        {/* MODAL ADD/EDIT ORDER */}
         <Modal open={openModal} onClose={() => setOpenModal(false)}>
           <Box
             sx={{
@@ -244,26 +220,65 @@ export default function ProductPage() {
                 fontWeight: "bold",
               }}
             >
-              {editingProduct?.id ? "Edit Item" : "Add Item"}
+              {editingOrder?.id ? "Edit Order" : "Add Order"}
             </h2>
-            {["product", "sku", "location", "price", "stock"].map((field) => (
-              <TextField
-                key={field}
-                fullWidth
-                label={field.charAt(0).toUpperCase() + field.slice(1)}
-                type={
-                  field === "price" || field === "stock" ? "number" : "text"
-                }
-                value={editingProduct?.[field as keyof Product] || ""}
+            <TextField
+              fullWidth
+              label="Date"
+              type="date"
+              value={editingOrder?.date || ""}
+              onChange={(e) =>
+                setEditingOrder({ ...editingOrder, date: e.target.value })
+              }
+              margin="dense"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              fullWidth
+              label="Product"
+              value={editingOrder?.product || ""}
+              onChange={(e) =>
+                setEditingOrder({ ...editingOrder, product: e.target.value })
+              }
+              margin="dense"
+            />
+            <TextField
+              fullWidth
+              label="Customer"
+              value={editingOrder?.customer || ""}
+              onChange={(e) =>
+                setEditingOrder({ ...editingOrder, customer: e.target.value })
+              }
+              margin="dense"
+            />
+            <TextField
+              fullWidth
+              label="Total Price"
+              type="number"
+              value={editingOrder?.totalPrice || ""}
+              onChange={(e) =>
+                setEditingOrder({
+                  ...editingOrder,
+                  totalPrice: +e.target.value,
+                })
+              }
+              margin="dense"
+            />
+            <FormControl fullWidth margin="dense">
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={editingOrder?.status || ""}
                 onChange={(e) =>
-                  setEditingProduct({
-                    ...editingProduct,
-                    [field]: e.target.value,
-                  })
+                  setEditingOrder({ ...editingOrder, status: e.target.value })
                 }
-                margin="dense"
-              />
-            ))}
+              >
+                <MenuItem value="Pending">Pending</MenuItem>
+                <MenuItem value="Processing">Processing</MenuItem>
+                <MenuItem value="Shipped">Shipped</MenuItem>
+                <MenuItem value="Delivered">Delivered</MenuItem>
+                <MenuItem value="Cancelled">Cancelled</MenuItem>
+              </Select>
+            </FormControl>
             <Button
               fullWidth
               variant="contained"
