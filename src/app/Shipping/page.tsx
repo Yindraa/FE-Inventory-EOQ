@@ -64,7 +64,8 @@ export default function ShippingPage() {
         await axios.put(`/api/shipping/${editingShipping.id}`, editingShipping);
       } else {
         // Tambah Data Baru (POST request tanpa orderId, karena backend yang buat)
-        const { orderId, ...shippingData } = editingShipping!;
+        const { ...shippingData } = editingShipping!;
+
         await axios.post("/api/shipping", shippingData);
       }
       setOpenModal(false);
