@@ -1,3 +1,7 @@
+"use client";
+
+import type React from "react";
+
 import {
   FaHome,
   FaBox,
@@ -7,8 +11,8 @@ import {
   FaSignOutAlt,
 } from "react-icons/fa";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 
 interface NavItemProps {
   icon: React.ElementType;
@@ -55,8 +59,46 @@ const NavItem: React.FC<NavItemProps> = ({
 };
 
 const LeftSidebar: React.FC = () => {
-  const pathname = usePathname();
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
+  const [currentPath, setCurrentPath] = useState("");
+
+  // Fix hydration mismatch by only running on client
+  useEffect(() => {
+    setIsMounted(true);
+    setCurrentPath(window.location.pathname);
+  }, []);
+
+  const handleLogout = () => {
+    if (
+      typeof window !== "undefined" &&
+      window.confirm("Are you sure you want to log out?")
+    ) {
+      // Remove session data if any (e.g., localStorage)
+      localStorage.removeItem("userToken"); // Adjust according to the token used
+
+      // Redirect to login page
+      router.push("/");
+    }
+  };
+
+  // Return a simple placeholder during server-side rendering
+  if (!isMounted) {
+    return (
+      <aside className="w-64 bg-black text-white p-6 flex flex-col space-y-6">
+        <div className="flex justify-center">
+          {/* Empty space for logo */}
+          <div className="w-[150px] h-[150px]"></div>
+        </div>
+        <nav className="flex flex-col space-y-3">
+          {/* Empty placeholders for nav items */}
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="w-[90%] h-[48px]"></div>
+          ))}
+        </nav>
+      </aside>
+    );
+  }
 
   return (
     <aside className="w-64 bg-black text-white p-6 flex flex-col space-y-6">
@@ -69,43 +111,43 @@ const LeftSidebar: React.FC = () => {
         />
       </div>
 
-      {/* Navigasi */}
+      {/* Navigation */}
       <nav className="flex flex-col space-y-3">
         <NavItem
           icon={FaHome}
           text="Home"
-          isActive={pathname.includes("Dashboard")}
+          isActive={currentPath.includes("Dashboard")}
           onClick={() => router.push("/Dashboard")}
         />
         <NavItem
           icon={FaBox}
           text="Product"
-          isActive={pathname.includes("Product")}
+          isActive={currentPath.includes("Product")}
           onClick={() => router.push("/Product")}
         />
         <NavItem
           icon={FaShippingFast}
           text="Order"
-          isActive={pathname.includes("Order")}
+          isActive={currentPath.includes("Order")}
           onClick={() => router.push("/Order")}
         />
         <NavItem
           icon={FaTruckMoving}
           text="Shipping"
-          isActive={pathname.includes("Shipping")}
+          isActive={currentPath.includes("Shipping")}
           onClick={() => router.push("/Shipping")}
         />
         <NavItem
           icon={FaChartLine}
           text="EOQ"
-          isActive={pathname.includes("EOQ")}
+          isActive={currentPath.includes("EOQ")}
           onClick={() => router.push("/EOQ")}
         />
         <NavItem
           icon={FaSignOutAlt}
           text="Log Out"
           isActive={false}
-          onClick={() => router.push("/Logout")}
+          onClick={handleLogout}
         />
       </nav>
     </aside>

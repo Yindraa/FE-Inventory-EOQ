@@ -1,9 +1,11 @@
 "use client";
 
+import type React from "react";
+
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { IconType } from "react-icons";
-import { FaUser, FaLock } from "react-icons/fa";
+import type { IconType } from "react-icons";
+import { FaEnvelope, FaLock } from "react-icons/fa";
 import Image from "next/image";
 
 interface InputProps {
@@ -37,9 +39,9 @@ const InputField = ({
 
 export default function LoginPage() {
   const router = useRouter();
-  const API_URL = "https://api.example.com"; // Ganti dengan URL backend
+  const API_URL = "https://backend-eoq-production.up.railway.app";
 
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
@@ -48,17 +50,30 @@ export default function LoginPage() {
 
   useEffect(() => {
     setIsClient(true);
-
     if (typeof window === "undefined") return;
 
-    const savedUsername = localStorage.getItem("rememberedUsername") || "";
-    const token = localStorage.getItem("token");
+    const savedEmail = localStorage.getItem("rememberedEmail") || "";
+    setEmail(savedEmail);
+    setRememberMe(!!savedEmail);
 
-    setUsername(savedUsername);
-    setRememberMe(!!savedUsername);
+    // Check if user is already logged in with session
+    const checkSession = async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/session`, {
+          method: "GET",
+          credentials: "include", // Ensure cookies are sent
+        });
 
-    if (token) router.push("/Dashboard");
-  }, [router]);
+        if (res.ok) {
+          router.push("/Dashboard");
+        }
+      } catch (error) {
+        console.error("Session check failed:", error);
+      }
+    };
+
+    checkSession();
+  }, [router, API_URL]);
 
   const handleLogin = useCallback(
     async (e: React.FormEvent) => {
@@ -66,8 +81,8 @@ export default function LoginPage() {
       setError("");
       setLoading(true);
 
-      if (!username.trim() || !password.trim()) {
-        setError("Username and password cannot be empty.");
+      if (!email.trim() || !password.trim()) {
+        setError("Email and password cannot be empty.");
         setLoading(false);
         return;
       }
@@ -76,7 +91,8 @@ export default function LoginPage() {
         const response = await fetch(`${API_URL}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
+          credentials: "include", // Use cookies from backend
+          body: JSON.stringify({ email, password }),
         });
 
         if (!response.ok) {
@@ -84,15 +100,10 @@ export default function LoginPage() {
           throw new Error(errorData.message || "Login failed!");
         }
 
-        const data = await response.json();
-
-        if (typeof window !== "undefined") {
-          localStorage.setItem("token", data.token);
-          if (rememberMe) {
-            localStorage.setItem("rememberedUsername", username);
-          } else {
-            localStorage.removeItem("rememberedUsername");
-          }
+        if (rememberMe) {
+          localStorage.setItem("rememberedEmail", email);
+        } else {
+          localStorage.removeItem("rememberedEmail");
         }
 
         alert("Login successful!");
@@ -107,7 +118,7 @@ export default function LoginPage() {
         setLoading(false);
       }
     },
-    [username, password, rememberMe, router]
+    [email, password, rememberMe, router, API_URL]
   );
 
   return (
@@ -129,20 +140,18 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* Container Login */}
       <div className="bg-white shadow-2xl rounded-lg p-8 w-[400px] text-black mt-20">
         <h2 className="text-center text-2xl font-semibold mb-6">USER LOGIN</h2>
 
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
-        {/* Form Login */}
         <form className="space-y-4" onSubmit={handleLogin}>
           <InputField
-            type="text"
-            placeholder="Username"
-            Icon={FaUser}
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            type="email"
+            placeholder="Email"
+            Icon={FaEnvelope}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
           <InputField
             type="password"
@@ -171,7 +180,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Sign Up Text */}
         <p className="text-center text-sm text-gray-600 mt-4">
           {"Don't have an account?"}{" "}
           <a href="/Sign-Up" className="text-blue-500 hover:underline">

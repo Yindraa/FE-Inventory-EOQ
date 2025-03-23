@@ -7,7 +7,7 @@ import Link from "next/link";
 
 export default function SignUpPage() {
   const router = useRouter();
-  const API_URL = "https://api.example.com"; // Ganti dengan URL backend
+  const API_URL = "https://backend-eoq-production.up.railway.app";
 
   const [formData, setFormData] = useState({
     username: "",
@@ -30,6 +30,27 @@ export default function SignUpPage() {
     setError("");
     setLoading(true);
 
+    const usernameRegex = /^[a-zA-Z0-9_]+$/;
+    if (!usernameRegex.test(formData.username)) {
+      setError("Username hanya boleh berisi huruf, angka, dan underscore (_).");
+      setLoading(false);
+      return;
+    }
+
+    const emailRegex = /^[\w-]+@[\w-]+\.[a-z]{2,}$/;
+    const phoneRegex = /^\d{10,15}$/;
+    if (!emailRegex.test(formData.email) && !phoneRegex.test(formData.email)) {
+      setError("Masukkan email atau nomor telepon yang valid.");
+      setLoading(false);
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError("Password harus minimal 6 karakter.");
+      setLoading(false);
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match!");
       setLoading(false);
@@ -47,14 +68,14 @@ export default function SignUpPage() {
         }),
       });
 
-      const data: { message?: string; success?: boolean } =
-        await response.json();
-      if (!response.ok || !data.success)
+      const data = await response.json();
+      if (!response.ok || !data.success) {
         throw new Error(data.message || "Sign Up failed!");
+      }
 
       alert("Account created successfully! You can now log in.");
       router.push("/");
-    } catch (err: unknown) {
+    } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unknown error occurred."
       );
@@ -71,14 +92,11 @@ export default function SignUpPage() {
       <div className="absolute inset-0 flex justify-center items-center">
         <div className="w-full h-full bg-black opacity-60"></div>
       </div>
-
       <div className="relative bg-white shadow-2xl rounded-lg p-8 w-[400px] text-black">
         <h2 className="text-center text-2xl font-semibold mb-6">
           CREATE ACCOUNT
         </h2>
-
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
         <form className="space-y-4" onSubmit={handleSignUp}>
           <div>
             <label className="text-sm font-semibold">USERNAME:</label>
@@ -91,21 +109,17 @@ export default function SignUpPage() {
               required
             />
           </div>
-
           <div>
             <label className="text-sm font-semibold">EMAIL/TELEPON:</label>
             <input
               type="text"
               name="email"
-              pattern="^[\w-]+@[\w-]+\.[a-z]{2,}$|^\d{10,15}$"
-              title="Masukkan email yang valid atau nomor telepon (10-15 digit angka)"
               value={formData.email}
               onChange={handleChange}
               className="w-full border-b border-black py-2 focus:outline-none text-black"
               required
             />
           </div>
-
           <div className="relative">
             <label className="text-sm font-semibold">PASSWORD:</label>
             <input
@@ -124,7 +138,6 @@ export default function SignUpPage() {
               {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
             </button>
           </div>
-
           <div className="relative">
             <label className="text-sm font-semibold">CONFIRM PASSWORD:</label>
             <input
@@ -147,7 +160,6 @@ export default function SignUpPage() {
               )}
             </button>
           </div>
-
           <button
             type="submit"
             className="w-full bg-black text-white py-2 rounded-lg hover:bg-gray-800"
@@ -156,8 +168,6 @@ export default function SignUpPage() {
             {loading ? "Signing Up..." : "SIGN UP"}
           </button>
         </form>
-
-        {/* Teks Already have an account? Login */}
         <p className="text-center text-sm text-gray-600 mt-4">
           Already have an account?{" "}
           <Link href="/" className="text-blue-500 hover:underline">
