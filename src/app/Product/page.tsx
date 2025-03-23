@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -20,19 +20,29 @@ import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
 import { FaTrash } from "react-icons/fa";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import LeftSidebar from "../components/LeftSidebar";
 import { useRouter } from "next/navigation";
 
-// Update the interface to match the API's expected fields
 interface Product {
   id: number;
-  name: string; // Changed from 'product' to 'name'
+  name: string;
   sku: string;
   location: string;
   price: number;
-  quantity: number; // Changed from 'stock' to 'quantity'
+  quantity: number;
   checked?: boolean;
+}
+
+interface ApiProduct {
+  id: number;
+  product?: string;
+  name?: string;
+  sku: string;
+  location: string;
+  price: number;
+  stock?: number;
+  quantity?: number;
 }
 
 export default function ProductPage() {
@@ -40,65 +50,64 @@ export default function ProductPage() {
   const [data, setData] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [openModal, setOpenModal] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(
-    null
-  );
+  const [editingProduct, setEditingProduct] = useState<Partial<Product>>({
+    name: "",
+    sku: "",
+    location: "",
+    price: 0,
+    quantity: 1,
+  });
   const [selectAll, setSelectAll] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
 
-  // Fix hydration issues by only rendering after component is mounted
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Configure axios and fetch products only after mounting
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await axios.get<ApiProduct[]>(
+        "https://backend-eoq-production.up.railway.app/product",
+        { withCredentials: true }
+      );
+
+      setData(
+        response.data.map((item) => ({
+          ...item,
+          name: item.name || item.product || "",
+          quantity: item.quantity || item.stock || 0,
+          checked: false,
+        }))
+      );
+    } catch (error: unknown) {
+      console.error("Error fetching products:", error);
+
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          setError("Your session has expired. Please log in again.");
+          router.push("/login");
+        } else {
+          setError("Failed to load products. Please try again later.");
+        }
+      } else {
+        setError("An unexpected error occurred");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router]);
+
   useEffect(() => {
     if (isMounted) {
       axios.defaults.withCredentials = true;
       fetchProducts();
     }
-  }, [isMounted]);
-
-  // Fetch data from backend
-  const fetchProducts = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await axios.get(
-        "https://backend-eoq-production.up.railway.app/product",
-        {
-          withCredentials: true, // Include cookies in the request
-        }
-      );
-
-      // Map API response to our interface
-      // This handles if the API returns 'product' or 'name', and 'stock' or 'quantity'
-      setData(
-        response.data.map((item: any) => ({
-          ...item,
-          // Ensure we have the right field names for display
-          name: item.name || item.product,
-          quantity: item.quantity || item.stock,
-          checked: false,
-        }))
-      );
-    } catch (error: any) {
-      console.error("Error fetching products:", error);
-
-      if (error.response?.status === 401) {
-        setError("Your session has expired. Please log in again.");
-        // Redirect to login page
-        router.push("/login");
-      } else {
-        setError("Failed to load products. Please try again later.");
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [isMounted, fetchProducts]);
 
   const handleDelete = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this product?")) {
@@ -108,18 +117,23 @@ export default function ProductPage() {
     try {
       await axios.delete(
         `https://backend-eoq-production.up.railway.app/product/${id}`,
-        {
-          withCredentials: true, // Include cookies in the request
-        }
+        { withCredentials: true }
       );
       fetchProducts();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting product:", error);
-      if (error.response?.status === 401) {
-        setError("Your session has expired. Please log in again.");
-        router.push("/login");
+
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          setError("Your session has expired. Please log in again.");
+          router.push("/login");
+        } else {
+          setError(error.response?.data?.message || "Failed to delete product");
+        }
+      } else if (error instanceof Error) {
+        setError(error.message);
       } else {
-        setError("Failed to delete product. Please try again.");
+        setError("An unknown error occurred");
       }
     }
   };
@@ -142,13 +156,11 @@ export default function ProductPage() {
 
   const handleAddOrEdit = async () => {
     try {
-      // Ensure all required fields are present
-      if (!editingProduct?.name) {
+      if (!editingProduct.name) {
         setError("Product name is required.");
         return;
       }
 
-      // Ensure price and quantity are valid numbers
       if (
         isNaN(Number(editingProduct.price)) ||
         isNaN(Number(editingProduct.quantity))
@@ -157,7 +169,6 @@ export default function ProductPage() {
         return;
       }
 
-      // Ensure quantity is a positive integer
       if (
         Number(editingProduct.quantity) <= 0 ||
         !Number.isInteger(Number(editingProduct.quantity))
@@ -166,7 +177,6 @@ export default function ProductPage() {
         return;
       }
 
-      // Format the data properly for the API
       const productData = {
         name: editingProduct.name,
         sku: editingProduct.sku,
@@ -175,53 +185,38 @@ export default function ProductPage() {
         quantity: Number(editingProduct.quantity),
       };
 
-      console.log("Sending product data:", productData);
-
-      if (editingProduct?.id) {
-        const response = await axios.put(
+      if (editingProduct.id) {
+        await axios.put(
           `https://backend-eoq-production.up.railway.app/product/${editingProduct.id}`,
           productData,
-          {
-            withCredentials: true,
-          }
+          { withCredentials: true }
         );
-        console.log("Update response:", response.data);
       } else {
-        const response = await axios.post(
+        await axios.post(
           "https://backend-eoq-production.up.railway.app/product",
           productData,
-          {
-            withCredentials: true,
-          }
+          { withCredentials: true }
         );
-        console.log("Create response:", response.data);
       }
 
       setOpenModal(false);
       setError(null);
       fetchProducts();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving product:", error);
 
-      if (error.response) {
-        console.error("Response data:", error.response.data);
-        console.error("Response status:", error.response.status);
-
-        if (error.response.status === 401) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
           setError("Your session has expired. Please log in again.");
           router.push("/login");
-        } else if (error.response.data && error.response.data.message) {
-          // Use the error message from the API if available
-          setError(`Failed to save product: ${error.response.data.message}`);
         } else {
           setError(
-            `Failed to save product. Server returned status ${error.response.status}.`
+            error.response?.data?.message ||
+              `Failed to save product. Server returned status ${error.response?.status}`
           );
         }
       } else {
-        setError(
-          "Failed to save product. Please check your connection and try again."
-        );
+        setError("Failed to save product. Please check your connection.");
       }
     }
   };
@@ -232,10 +227,9 @@ export default function ProductPage() {
   };
 
   const filteredData = data.filter((row) =>
-    row.name ? row.name.toLowerCase().includes(searchTerm.toLowerCase()) : false
+    row.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Return a simple loading state during server-side rendering
   if (!isMounted) {
     return (
       <div style={{ display: "flex", minHeight: "100vh" }}>
