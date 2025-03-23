@@ -20,7 +20,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
 import { FaTrash } from "react-icons/fa";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import LeftSidebar from "../components/LeftSidebar";
 import { useRouter } from "next/navigation";
 
