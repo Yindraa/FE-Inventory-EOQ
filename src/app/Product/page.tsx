@@ -8,18 +8,28 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   TextField,
   IconButton,
   Checkbox,
   Button,
   Modal,
   Box,
+  Alert,
+  Typography,
+  Card,
+  CardContent,
+  Chip,
+  useMediaQuery,
+  useTheme,
+  InputAdornment,
+  LinearProgress,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
-import { FaTrash } from "react-icons/fa";
+import DeleteIcon from "@mui/icons-material/Delete";
+import SortIcon from "@mui/icons-material/Sort";
+import InventoryIcon from "@mui/icons-material/Inventory";
 import axios from "axios";
 import LeftSidebar from "../components/LeftSidebar";
 import { useRouter } from "next/navigation";
@@ -47,6 +57,10 @@ interface ApiProduct {
 
 export default function ProductPage() {
   const router = useRouter();
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMediumScreen = useMediaQuery(theme.breakpoints.between("sm", "md"));
+
   const [data, setData] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [openModal, setOpenModal] = useState(false);
@@ -61,6 +75,8 @@ export default function ProductPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [sortField, setSortField] = useState<string>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
     setIsMounted(true);
@@ -73,8 +89,12 @@ export default function ProductPage() {
     try {
       const response = await axios.get<ApiProduct[]>(
         "https://backend-eoq-production.up.railway.app/product",
-        { withCredentials: true }
+        {
+          withCredentials: true,
+        }
       );
+
+      console.log("Raw product data:", response.data);
 
       setData(
         response.data.map((item) => ({
@@ -90,7 +110,7 @@ export default function ProductPage() {
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 401) {
           setError("Your session has expired. Please log in again.");
-          router.push("/login");
+          router.push("/");
         } else {
           setError("Failed to load products. Please try again later.");
         }
@@ -115,26 +135,38 @@ export default function ProductPage() {
     }
 
     try {
-      await axios.delete(
+      setIsLoading(true);
+      const response = await axios.delete(
         `https://backend-eoq-production.up.railway.app/product/${id}`,
-        { withCredentials: true }
+        {
+          withCredentials: true,
+        }
       );
-      fetchProducts();
+      console.log("Product deleted successfully", response);
+
+      // Optimistic update
+      setData((prevData) => prevData.filter((product) => product.id !== id));
     } catch (error: unknown) {
       console.error("Error deleting product:", error);
 
+      // Check if error is an AxiosError and handle accordingly
       if (axios.isAxiosError(error)) {
+        // Handle 401 (Unauthorized) - session expired
         if (error.response?.status === 401) {
           setError("Your session has expired. Please log in again.");
-          router.push("/login");
+          router.push("/");
         } else {
+          // Handle other HTTP status codes, display message from backend if available
           setError(error.response?.data?.message || "Failed to delete product");
         }
       } else if (error instanceof Error) {
+        // Handle unexpected error type
         setError(error.message);
       } else {
         setError("An unknown error occurred");
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -156,8 +188,11 @@ export default function ProductPage() {
 
   const handleAddOrEdit = async () => {
     try {
+      setIsLoading(true);
+
       if (!editingProduct.name) {
         setError("Product name is required.");
+        setIsLoading(false);
         return;
       }
 
@@ -166,6 +201,7 @@ export default function ProductPage() {
         isNaN(Number(editingProduct.quantity))
       ) {
         setError("Price and quantity must be valid numbers.");
+        setIsLoading(false);
         return;
       }
 
@@ -174,13 +210,14 @@ export default function ProductPage() {
         !Number.isInteger(Number(editingProduct.quantity))
       ) {
         setError("Quantity must be a positive integer.");
+        setIsLoading(false);
         return;
       }
 
       const productData = {
         name: editingProduct.name,
-        sku: editingProduct.sku,
-        location: editingProduct.location,
+        sku: editingProduct.sku || "",
+        location: editingProduct.location || "",
         price: Number(editingProduct.price),
         quantity: Number(editingProduct.quantity),
       };
@@ -189,26 +226,49 @@ export default function ProductPage() {
         await axios.put(
           `https://backend-eoq-production.up.railway.app/product/${editingProduct.id}`,
           productData,
-          { withCredentials: true }
+          {
+            withCredentials: true,
+          }
+        );
+
+        // Optimistic update
+        setData((prevData) =>
+          prevData.map((product) =>
+            product.id === editingProduct.id
+              ? { ...product, ...productData }
+              : product
+          )
         );
       } else {
-        await axios.post(
+        const response = await axios.post(
           "https://backend-eoq-production.up.railway.app/product",
           productData,
-          { withCredentials: true }
+          {
+            withCredentials: true,
+          }
         );
+
+        // Add the new product to the list
+        if (response.data) {
+          setData((prevData) => [
+            ...prevData,
+            {
+              ...response.data,
+              checked: false,
+            },
+          ]);
+        }
       }
 
       setOpenModal(false);
       setError(null);
-      fetchProducts();
     } catch (error: unknown) {
       console.error("Error saving product:", error);
 
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 401) {
           setError("Your session has expired. Please log in again.");
-          router.push("/login");
+          router.push("/");
         } else {
           setError(
             error.response?.data?.message ||
@@ -218,6 +278,8 @@ export default function ProductPage() {
       } else {
         setError("Failed to save product. Please check your connection.");
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -226,14 +288,339 @@ export default function ProductPage() {
     setOpenModal(true);
   };
 
-  const filteredData = data.filter((row) =>
-    row.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // New field, default to ascending
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  // Apply sorting and filtering
+  const sortedAndFilteredData = [...data]
+    .filter((row) => row.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      const aValue = a[sortField as keyof Product];
+      const bValue = b[sortField as keyof Product];
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        return sortDirection === "asc"
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+
+      // For numeric values
+      const aNum = Number(aValue) || 0;
+      const bNum = Number(bValue) || 0;
+
+      return sortDirection === "asc" ? aNum - bNum : bNum - aNum;
+    });
+
+  // Get responsive table columns
+  const getTableColumns = () => {
+    if (isSmallScreen) {
+      return (
+        <>
+          <TableCell padding="checkbox">
+            <Checkbox checked={selectAll} onChange={handleSelectAll} />
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              Product
+              <IconButton size="small" onClick={() => handleSort("name")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "name" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              Qty
+              <IconButton size="small" onClick={() => handleSort("quantity")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "quantity" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>Actions</TableCell>
+        </>
+      );
+    } else if (isMediumScreen) {
+      return (
+        <>
+          <TableCell padding="checkbox">
+            <Checkbox checked={selectAll} onChange={handleSelectAll} />
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              Product
+              <IconButton size="small" onClick={() => handleSort("name")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "name" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              SKU
+              <IconButton size="small" onClick={() => handleSort("sku")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "sku" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              Price
+              <IconButton size="small" onClick={() => handleSort("price")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "price" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              Qty
+              <IconButton size="small" onClick={() => handleSort("quantity")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "quantity" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>Actions</TableCell>
+        </>
+      );
+    } else {
+      return (
+        <>
+          <TableCell padding="checkbox">
+            <Checkbox checked={selectAll} onChange={handleSelectAll} />
+          </TableCell>
+          <TableCell>ID</TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              Product
+              <IconButton size="small" onClick={() => handleSort("name")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "name" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              SKU
+              <IconButton size="small" onClick={() => handleSort("sku")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "sku" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              Location
+              <IconButton size="small" onClick={() => handleSort("location")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "location" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              Price
+              <IconButton size="small" onClick={() => handleSort("price")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "price" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              Quantity
+              <IconButton size="small" onClick={() => handleSort("quantity")}>
+                <SortIcon
+                  fontSize="small"
+                  color={sortField === "quantity" ? "primary" : "action"}
+                />
+              </IconButton>
+            </Box>
+          </TableCell>
+          <TableCell>Actions</TableCell>
+        </>
+      );
+    }
+  };
+
+  // Render table rows based on screen size
+  const renderTableRow = (row: Product) => {
+    if (isSmallScreen) {
+      return (
+        <>
+          <TableCell padding="checkbox">
+            <Checkbox
+              checked={row.checked}
+              onChange={() => handleSelectItem(row.id)}
+            />
+          </TableCell>
+          <TableCell>
+            <Typography variant="body2" fontWeight="medium">
+              {row.name}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              ${row.price.toFixed(2)}
+            </Typography>
+          </TableCell>
+          <TableCell>
+            <Chip
+              label={row.quantity}
+              color={
+                row.quantity > 10
+                  ? "success"
+                  : row.quantity > 0
+                  ? "warning"
+                  : "error"
+              }
+              size="small"
+            />
+          </TableCell>
+          <TableCell>
+            <IconButton
+              size="small"
+              sx={{ color: "primary.main" }}
+              onClick={() => handleEditClick(row)}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              sx={{ color: "error.main" }}
+              onClick={() => handleDelete(row.id)}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </TableCell>
+        </>
+      );
+    } else if (isMediumScreen) {
+      return (
+        <>
+          <TableCell padding="checkbox">
+            <Checkbox
+              checked={row.checked}
+              onChange={() => handleSelectItem(row.id)}
+            />
+          </TableCell>
+          <TableCell>{row.name}</TableCell>
+          <TableCell>{row.sku || "—"}</TableCell>
+          <TableCell>${row.price.toFixed(2)}</TableCell>
+          <TableCell>
+            <Chip
+              label={row.quantity}
+              color={
+                row.quantity > 10
+                  ? "success"
+                  : row.quantity > 0
+                  ? "warning"
+                  : "error"
+              }
+              size="small"
+            />
+          </TableCell>
+          <TableCell>
+            <IconButton
+              size="small"
+              sx={{ color: "primary.main" }}
+              onClick={() => handleEditClick(row)}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              sx={{ color: "error.main" }}
+              onClick={() => handleDelete(row.id)}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </TableCell>
+        </>
+      );
+    } else {
+      return (
+        <>
+          <TableCell padding="checkbox">
+            <Checkbox
+              checked={row.checked}
+              onChange={() => handleSelectItem(row.id)}
+            />
+          </TableCell>
+          <TableCell>{row.id}</TableCell>
+          <TableCell>{row.name}</TableCell>
+          <TableCell>{row.sku || "—"}</TableCell>
+          <TableCell>{row.location || "—"}</TableCell>
+          <TableCell>${row.price.toFixed(2)}</TableCell>
+          <TableCell>
+            <Chip
+              label={row.quantity}
+              color={
+                row.quantity > 10
+                  ? "success"
+                  : row.quantity > 0
+                  ? "warning"
+                  : "error"
+              }
+              size="small"
+            />
+          </TableCell>
+          <TableCell>
+            <IconButton
+              sx={{ color: "primary.main" }}
+              onClick={() => handleEditClick(row)}
+            >
+              <EditIcon />
+            </IconButton>
+            <IconButton
+              sx={{ color: "error.main" }}
+              onClick={() => handleDelete(row.id)}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </TableCell>
+        </>
+      );
+    }
+  };
 
   if (!isMounted) {
     return (
       <div style={{ display: "flex", minHeight: "100vh" }}>
-        <div style={{ width: "256px", backgroundColor: "black" }}></div>
+        <div
+          style={{
+            width: isSmallScreen ? "64px" : "256px",
+            backgroundColor: "black",
+          }}
+        ></div>
         <div style={{ flex: 1, padding: "20px" }}>Loading...</div>
       </div>
     );
@@ -241,185 +628,240 @@ export default function ProductPage() {
 
   return (
     <div
-      style={{ display: "flex", backgroundColor: "white", minHeight: "100vh" }}
+      style={{
+        display: "flex",
+        backgroundColor: "#f5f5f5",
+        minHeight: "100vh",
+      }}
     >
       <LeftSidebar />
       <div
         style={{
           flex: 1,
-          padding: "20px",
+          padding: isSmallScreen ? "10px" : "20px",
           minHeight: "100vh",
           overflow: "auto",
         }}
       >
-        <h2
-          style={{
-            marginBottom: "15px",
-            fontSize: "26px",
-            fontWeight: "bold",
-            color: "#333",
-          }}
-        >
-          List Product
-        </h2>
+        <Card elevation={0} sx={{ mb: 3, borderRadius: 2 }}>
+          <CardContent>
+            <Typography
+              variant={isSmallScreen ? "h5" : "h4"}
+              fontWeight="bold"
+              color="text.primary"
+              gutterBottom
+            >
+              Product Inventory
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Manage your product inventory. Add, edit, and track your products.
+            </Typography>
+          </CardContent>
+        </Card>
 
         {error && (
-          <Paper
-            sx={{
-              padding: "10px",
-              marginBottom: "10px",
-              backgroundColor: "#ffebee",
-              color: "#d32f2f",
-            }}
+          <Alert
+            severity="error"
+            sx={{ mb: 3, borderRadius: 2 }}
+            action={
+              error.includes("session has expired") ? (
+                <Button
+                  color="inherit"
+                  size="small"
+                  onClick={() => router.push("/")}
+                >
+                  Login
+                </Button>
+              ) : undefined
+            }
           >
             {error}
-            {error.includes("session has expired") && (
-              <Button
-                variant="text"
-                color="error"
-                onClick={() => router.push("/login")}
-                sx={{ ml: 2 }}
-              >
-                Go to Login
-              </Button>
-            )}
-          </Paper>
+          </Alert>
         )}
 
-        <Paper
-          sx={{
-            padding: "10px",
-            marginBottom: "10px",
-            backgroundColor: "white",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <TextField
-              variant="outlined"
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: <SearchIcon style={{ marginRight: "5px" }} />,
-              }}
-              sx={{ width: "300px" }}
-            />
-            <Button
-              variant="contained"
-              sx={{ bgcolor: "#292929", color: "white" }}
-              startIcon={<AddIcon />}
-              onClick={() => {
-                // Initialize with empty values but proper types
-                setEditingProduct({
-                  name: "",
-                  sku: "",
-                  location: "",
-                  price: 0,
-                  quantity: 1, // Default to 1 for quantity
-                });
-                setOpenModal(true);
+        <Card elevation={0} sx={{ mb: 3, borderRadius: 2 }}>
+          <CardContent sx={{ p: isSmallScreen ? 2 : 3 }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: isSmallScreen ? "column" : "row",
+                justifyContent: "space-between",
+                alignItems: isSmallScreen ? "stretch" : "center",
+                gap: isSmallScreen ? 2 : 0,
               }}
             >
-              Add Item
-            </Button>
-          </div>
-        </Paper>
+              <TextField
+                variant="outlined"
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <SearchIcon sx={{ color: "text.secondary", mr: 1 }} />
+                  ),
+                }}
+                sx={{
+                  width: isSmallScreen ? "100%" : "300px",
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "8px",
+                  },
+                }}
+                size={isSmallScreen ? "small" : "medium"}
+              />
+              <Button
+                variant="contained"
+                sx={{
+                  bgcolor: "#292929",
+                  color: "white",
+                  borderRadius: "8px",
+                  px: 3,
+                  "&:hover": {
+                    bgcolor: "#444",
+                  },
+                }}
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  // Initialize with empty values but proper types
+                  setEditingProduct({
+                    name: "",
+                    sku: "",
+                    location: "",
+                    price: 0,
+                    quantity: 1, // Default to 1 for quantity
+                  });
+                  setOpenModal(true);
+                }}
+                fullWidth={isSmallScreen}
+                size={isSmallScreen ? "small" : "medium"}
+              >
+                Add Product
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
 
-        {/* PRODUCT TABLE */}
         {isLoading ? (
-          <Paper sx={{ p: 3, textAlign: "center" }}>Loading products...</Paper>
+          <Card elevation={0} sx={{ borderRadius: 2 }}>
+            <CardContent sx={{ p: 0 }}>
+              <LinearProgress />
+              <Box sx={{ p: 4, textAlign: "center" }}>
+                <Typography variant="body1" color="text.secondary">
+                  Loading products...
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
         ) : (
-          <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
-            <Table>
-              <TableHead>
-                <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-                  <TableCell>
-                    <Checkbox checked={selectAll} onChange={handleSelectAll} />
-                  </TableCell>
-                  <TableCell>No ID</TableCell>
-                  <TableCell>Product</TableCell>
-                  <TableCell>SKU</TableCell>
-                  <TableCell>Location</TableCell>
-                  <TableCell>Price</TableCell>
-                  <TableCell>Quantity</TableCell>
-                  <TableCell>Action</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} align="center">
-                      No products found
-                    </TableCell>
+          <Card elevation={0} sx={{ borderRadius: 2 }}>
+            <TableContainer sx={{ borderRadius: 2 }}>
+              <Table size={isSmallScreen ? "small" : "medium"}>
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: "#f8f9fa" }}>
+                    {getTableColumns()}
                   </TableRow>
-                ) : (
-                  filteredData.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={row.checked}
-                          onChange={() => handleSelectItem(row.id)}
-                        />
-                      </TableCell>
-                      <TableCell>{row.id}</TableCell>
-                      <TableCell>{row.name}</TableCell>
-                      <TableCell>{row.sku}</TableCell>
-                      <TableCell>{row.location}</TableCell>
-                      <TableCell>{row.price}</TableCell>
-                      <TableCell>{row.quantity}</TableCell>
-                      <TableCell>
-                        <IconButton
-                          sx={{ color: "black" }}
-                          onClick={() => handleEditClick(row)}
+                </TableHead>
+                <TableBody>
+                  {sortedAndFilteredData.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={isSmallScreen ? 4 : isMediumScreen ? 6 : 8}
+                        align="center"
+                      >
+                        <Box
+                          sx={{
+                            py: isSmallScreen ? 4 : 6,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: 2,
+                          }}
                         >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          sx={{ color: "red" }}
-                          onClick={() => handleDelete(row.id)}
-                        >
-                          <FaTrash />
-                        </IconButton>
+                          <InventoryIcon
+                            sx={{
+                              fontSize: isSmallScreen ? 40 : 60,
+                              color: "text.secondary",
+                            }}
+                          />
+                          <Typography
+                            variant={isSmallScreen ? "h6" : "h5"}
+                            color="text.secondary"
+                          >
+                            No products found
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {searchTerm
+                              ? "Try adjusting your search"
+                              : "Click 'Add Product' to create your first product"}
+                          </Typography>
+                          {searchTerm && (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={() => setSearchTerm("")}
+                              sx={{ mt: 1 }}
+                            >
+                              Clear Search
+                            </Button>
+                          )}
+                        </Box>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  ) : (
+                    sortedAndFilteredData.map((row) => (
+                      <TableRow
+                        key={row.id}
+                        sx={{
+                          "&:hover": {
+                            backgroundColor: "#f5f5f5",
+                          },
+                        }}
+                      >
+                        {renderTableRow(row)}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
         )}
 
-        {/* ADD/EDIT ITEM MODAL */}
-        <Modal open={openModal} onClose={() => setOpenModal(false)}>
+        <Modal
+          open={openModal}
+          onClose={() => !isLoading && setOpenModal(false)}
+        >
           <Box
             sx={{
               position: "absolute",
               top: "50%",
               left: "50%",
               transform: "translate(-50%, -50%)",
-              width: 400,
+              width: isSmallScreen ? "90%" : 400,
               bgcolor: "white",
               boxShadow: 24,
-              p: 4,
-              borderRadius: 1,
+              p: isSmallScreen ? 3 : 4,
+              borderRadius: 2,
+              maxHeight: "90vh",
+              overflow: "auto",
             }}
           >
-            <h2
-              style={{
+            <Typography
+              variant="h5"
+              sx={{
                 textAlign: "center",
-                color: "black",
+                color: "text.primary",
                 fontWeight: "bold",
-                marginBottom: "16px",
+                mb: 3,
               }}
             >
-              {editingProduct?.id ? "Edit Item" : "Add Item"}
-            </h2>
+              {editingProduct?.id ? "Edit Product" : "Add Product"}
+            </Typography>
+
+            {error && (
+              <Alert severity="error" sx={{ mb: 3, borderRadius: 1 }}>
+                {error}
+              </Alert>
+            )}
 
             {/* Product Name */}
             <TextField
@@ -433,12 +875,13 @@ export default function ProductPage() {
                   name: e.target.value,
                 })
               }
-              margin="dense"
+              margin="normal"
               required
               error={!editingProduct?.name}
               helperText={
                 !editingProduct?.name ? "Product name is required" : ""
               }
+              sx={{ mb: 2 }}
             />
 
             {/* SKU */}
@@ -453,7 +896,8 @@ export default function ProductPage() {
                   sku: e.target.value,
                 })
               }
-              margin="dense"
+              margin="normal"
+              sx={{ mb: 2 }}
             />
 
             {/* Location */}
@@ -468,7 +912,8 @@ export default function ProductPage() {
                   location: e.target.value,
                 })
               }
-              margin="dense"
+              margin="normal"
+              sx={{ mb: 2 }}
             />
 
             {/* Price */}
@@ -483,8 +928,14 @@ export default function ProductPage() {
                   price: Number(e.target.value),
                 })
               }
-              margin="dense"
-              InputProps={{ inputProps: { min: 0 } }}
+              margin="normal"
+              InputProps={{
+                inputProps: { min: 0, step: 0.01 },
+                startAdornment: (
+                  <InputAdornment position="start">$</InputAdornment>
+                ),
+              }}
+              sx={{ mb: 2 }}
             />
 
             {/* Quantity */}
@@ -499,7 +950,7 @@ export default function ProductPage() {
                   quantity: Number(e.target.value),
                 })
               }
-              margin="dense"
+              margin="normal"
               required
               error={
                 !editingProduct?.quantity ||
@@ -514,16 +965,38 @@ export default function ProductPage() {
                   : ""
               }
               InputProps={{ inputProps: { min: 1, step: 1 } }}
+              sx={{ mb: 3 }}
             />
 
-            <Button
-              fullWidth
-              variant="contained"
-              sx={{ mt: 2, bgcolor: "black", color: "white" }}
-              onClick={handleAddOrEdit}
-            >
-              SAVE
-            </Button>
+            <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={() => setOpenModal(false)}
+                disabled={isLoading}
+                size={isSmallScreen ? "small" : "medium"}
+                sx={{ borderRadius: "8px" }}
+              >
+                Cancel
+              </Button>
+              <Button
+                fullWidth
+                variant="contained"
+                sx={{
+                  bgcolor: "black",
+                  color: "white",
+                  borderRadius: "8px",
+                  "&:hover": {
+                    bgcolor: "#444",
+                  },
+                }}
+                onClick={handleAddOrEdit}
+                disabled={isLoading}
+                size={isSmallScreen ? "small" : "medium"}
+              >
+                {isLoading ? "Saving..." : "Save"}
+              </Button>
+            </Box>
           </Box>
         </Modal>
       </div>

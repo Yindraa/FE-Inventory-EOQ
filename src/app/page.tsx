@@ -1,45 +1,40 @@
 "use client";
 
 import type React from "react";
-
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import type { IconType } from "react-icons";
-import { FaEnvelope, FaLock } from "react-icons/fa";
 import Image from "next/image";
-
-interface InputProps {
-  type: string;
-  placeholder: string;
-  Icon: IconType;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}
-
-const InputField = ({
-  type,
-  placeholder,
-  Icon,
-  value,
-  onChange,
-}: InputProps) => {
-  return (
-    <div className="relative">
-      <Icon className="absolute left-3 top-3 text-black" />
-      <input
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 text-black"
-      />
-    </div>
-  );
-};
+import Link from "next/link";
+import {
+  Box,
+  TextField,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  Typography,
+  Card,
+  CardContent,
+  Alert,
+  InputAdornment,
+  IconButton,
+  useMediaQuery,
+  useTheme,
+  CircularProgress,
+} from "@mui/material";
+import EmailIcon from "@mui/icons-material/Email";
+import LockIcon from "@mui/icons-material/Lock";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 export default function LoginPage() {
   const router = useRouter();
-  const API_URL = "https://backend-eoq-production.up.railway.app";
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // Use environment variable for base URL
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    "https://backend-eoq-production.up.railway.app";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,6 +42,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -56,12 +52,11 @@ export default function LoginPage() {
     setEmail(savedEmail);
     setRememberMe(!!savedEmail);
 
-    // Check if user is already logged in with session
     const checkSession = async () => {
       try {
         const res = await fetch(`${API_URL}/auth/session`, {
           method: "GET",
-          credentials: "include", // Ensure cookies are sent
+          credentials: "include",
         });
 
         if (res.ok) {
@@ -91,7 +86,7 @@ export default function LoginPage() {
         const response = await fetch(`${API_URL}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: "include", // Use cookies from backend
+          credentials: "include",
           body: JSON.stringify({ email, password }),
         });
 
@@ -100,13 +95,22 @@ export default function LoginPage() {
           throw new Error(errorData.message || "Login failed!");
         }
 
+        const data = await response.json();
+        console.log("Login API Response JSON:", data);
+
+        if (data.token) {
+          localStorage.setItem("token", data.token);
+          console.log("Received token:", data.token);
+        } else {
+          console.warn("No token received from login response.");
+        }
+
         if (rememberMe) {
           localStorage.setItem("rememberedEmail", email);
         } else {
           localStorage.removeItem("rememberedEmail");
         }
 
-        alert("Login successful!");
         router.push("/Dashboard");
       } catch (err) {
         if (err instanceof Error) {
@@ -121,15 +125,52 @@ export default function LoginPage() {
     [email, password, rememberMe, router, API_URL]
   );
 
+  const handleTogglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
+  };
+
+  if (!isClient) {
+    return null;
+  }
+
   return (
-    <div
-      className="relative flex flex-col h-screen items-center justify-center bg-cover bg-center"
-      style={
-        isClient ? { backgroundImage: "url('/Image/LOGIN PAGE.png')" } : {}
-      }
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundImage: "url('/Image/LOGIN PAGE.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        position: "relative",
+        padding: isSmallScreen ? 2 : 4,
+      }}
     >
-      {isClient && (
-        <div className="absolute top-[8%]">
+      <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          zIndex: 0,
+        }}
+      />
+
+      <Box
+        sx={{
+          position: "relative",
+          zIndex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          width: "100%",
+        }}
+      >
+        <Box sx={{ mb: 4 }}>
           <Image
             src="/Image/EOQ TRACK LOGO 1.png"
             alt="EOQ Logo"
@@ -137,56 +178,128 @@ export default function LoginPage() {
             height={96}
             priority
           />
-        </div>
-      )}
+        </Box>
 
-      <div className="bg-white shadow-2xl rounded-lg p-8 w-[400px] text-black mt-20">
-        <h2 className="text-center text-2xl font-semibold mb-6">USER LOGIN</h2>
+        <Card
+          sx={{
+            maxWidth: isSmallScreen ? "100%" : 400,
+            width: "100%",
+            borderRadius: 2,
+            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
+            overflow: "visible",
+          }}
+        >
+          <CardContent sx={{ p: isSmallScreen ? 3 : 4 }}>
+            <Typography
+              variant="h5"
+              component="h1"
+              align="center"
+              fontWeight="bold"
+              gutterBottom
+            >
+              USER LOGIN
+            </Typography>
 
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+            {error && (
+              <Alert severity="error" sx={{ mb: 3, borderRadius: 1 }}>
+                {error}
+              </Alert>
+            )}
 
-        <form className="space-y-4" onSubmit={handleLogin}>
-          <InputField
-            type="email"
-            placeholder="Email"
-            Icon={FaEnvelope}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <InputField
-            type="password"
-            placeholder="Password"
-            Icon={FaLock}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <div className="flex justify-between items-center text-sm">
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={() => setRememberMe(!rememberMe)}
-                className="accent-gray-600"
+            <Box component="form" onSubmit={handleLogin} sx={{ mt: 2 }}>
+              <TextField
+                fullWidth
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                margin="normal"
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <EmailIcon color="action" />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 2 }}
               />
-              <span>Remember me</span>
-            </label>
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700"
-            disabled={loading}
-          >
-            {loading ? "Logging in..." : "Login"}
-          </button>
-        </form>
 
-        <p className="text-center text-sm text-gray-600 mt-4">
-          {"Don't have an account?"}{" "}
-          <a href="/Sign-Up" className="text-blue-500 hover:underline">
-            Sign up
-          </a>
-        </p>
-      </div>
-    </div>
+              <TextField
+                fullWidth
+                label="Password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                margin="normal"
+                required
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LockIcon color="action" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={handleTogglePasswordVisibility}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ mb: 2 }}
+              />
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={rememberMe}
+                    onChange={() => setRememberMe(!rememberMe)}
+                    color="primary"
+                  />
+                }
+                label="Remember me"
+                sx={{ mb: 2 }}
+              />
+
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                disabled={loading}
+                sx={{
+                  mt: 2,
+                  mb: 2,
+                  py: 1.5,
+                  bgcolor: "#292929",
+                  color: "white",
+                  "&:hover": { bgcolor: "#444" },
+                  borderRadius: "8px",
+                }}
+              >
+                {loading ? (
+                  <CircularProgress size={24} color="inherit" />
+                ) : (
+                  "Login"
+                )}
+              </Button>
+
+              <Typography variant="body2" align="center" sx={{ mt: 2 }}>
+                Don't have an account?{" "}
+                <Link
+                  href="/Sign-Up"
+                  style={{ color: "#1976d2", textDecoration: "none" }}
+                >
+                  Sign up
+                </Link>
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      </Box>
+    </Box>
   );
 }

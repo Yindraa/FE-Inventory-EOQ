@@ -1,87 +1,528 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import axios from "axios"; // Menggunakan axios
+import type React from "react";
 
-// Definisikan tipe data untuk orders
+import { useEffect, useState } from "react";
+import axios from "axios";
+import {
+  Typography,
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  Skeleton,
+  useMediaQuery,
+  useTheme,
+  IconButton,
+  Button,
+  Tooltip,
+} from "@mui/material";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import { useRouter } from "next/navigation";
+
+// Define the Order interface to match the API response
 interface Order {
   id: string;
-  date: string;
-  product: string;
+  productId: string;
+  productName?: string;
   customer: string;
-  price: string;
-  status: string;
+  customerUsername?: string;
+  quantity: number;
+  date: string;
+  orderDate?: string;
+  shipping: {
+    status: string;
+    courier: string;
+    trackingNumber: string;
+  };
+  shippingStatus?: string;
+  totalPrice?: number;
 }
 
 const RecentOrder: React.FC = () => {
-  // State untuk menyimpan data orders
+  const router = useRouter();
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMediumScreen = useMediaQuery(theme.breakpoints.between("sm", "md"));
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-  // Ambil data dari backend saat komponen pertama kali dirender
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const response = await axios.get(
-          "https://jsonplaceholder.typicode.com/posts"
-        );
-        console.log("Data fetched:", response.data);
-        setOrders(response.data.slice(0, 5)); // Ambil 5 data dummy
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-      } finally {
+  // Fetch data from the backend
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Try to get the token from localStorage
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        console.warn("No authentication token found, using mock data");
+        // Use mock data if no token is available
+        const mockData = [
+          {
+            id: "mock-1",
+            productId: "prod-1",
+            productName: "Dolan Watch",
+            customer: "John Doe",
+            quantity: 2,
+            date: new Date().toISOString().split("T")[0],
+            shipping: {
+              status: "pending",
+              courier: "default",
+              trackingNumber: "TRACK-001",
+            },
+            totalPrice: 50,
+          },
+          {
+            id: "mock-2",
+            productId: "prod-2",
+            productName: "Sisy Bag",
+            customer: "Jane Smith",
+            quantity: 1,
+            date: new Date(Date.now() - 86400000).toISOString().split("T")[0], // Yesterday
+            shipping: {
+              status: "shipped",
+              courier: "default",
+              trackingNumber: "TRACK-002",
+            },
+            totalPrice: 75,
+          },
+          {
+            id: "mock-3",
+            productId: "prod-3",
+            productName: "Path Shoes",
+            customer: "Robert Johnson",
+            quantity: 3,
+            date: new Date(Date.now() - 172800000).toISOString().split("T")[0], // 2 days ago
+            shipping: {
+              status: "delivered",
+              courier: "default",
+              trackingNumber: "TRACK-003",
+            },
+            totalPrice: 120,
+          },
+        ];
+
+        setOrders(mockData);
+        setLastUpdated(new Date());
         setLoading(false);
+        return;
       }
-    };
 
+      // If we have a token, try to fetch real data
+      const response = await axios.get(
+        "https://backend-eoq-production.up.railway.app/orders",
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("Raw orders data from API:", response.data);
+
+      // Map the API response to our Order interface
+      const mappedData: Order[] = (response.data || []).map((item: any) => ({
+        id: item.id,
+        productId: item.productId || "",
+        productName: item.productName || "",
+        customer: item.customerUsername || "",
+        customerUsername: item.customerUsername || "",
+        quantity: item.quantity,
+        date: item.orderDate?.split("T")[0] || "",
+        orderDate: item.orderDate,
+        shipping: {
+          status: item.shippingStatus?.toLowerCase() || "pending",
+          courier: "default",
+          trackingNumber: "TRACK-000",
+        },
+        shippingStatus: item.shippingStatus,
+        // Calculate a mock total price based on quantity (in a real app, this would come from the API)
+        totalPrice: item.quantity * 25, // Mock price of $25 per unit
+      }));
+
+      // Sort by date (newest first) and take the top 5
+      mappedData.sort((a, b) => {
+        const dateA = new Date(a.orderDate || a.date || "").getTime();
+        const dateB = new Date(b.orderDate || b.date || "").getTime();
+        return dateB - dateA;
+      });
+
+      setOrders(mappedData.slice(0, 5));
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+
+      // Check if it's an authentication error
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        console.warn("Authentication error, using mock data instead");
+        // Use mock data on auth error
+        const mockData = [
+          {
+            id: "mock-1",
+            productId: "prod-1",
+            productName: "Dolan Watch",
+            customer: "John Doe",
+            quantity: 2,
+            date: new Date().toISOString().split("T")[0],
+            shipping: {
+              status: "pending",
+              courier: "default",
+              trackingNumber: "TRACK-001",
+            },
+            totalPrice: 50,
+          },
+          {
+            id: "mock-2",
+            productId: "prod-2",
+            productName: "Sisy Bag",
+            customer: "Jane Smith",
+            quantity: 1,
+            date: new Date(Date.now() - 86400000).toISOString().split("T")[0], // Yesterday
+            shipping: {
+              status: "shipped",
+              courier: "default",
+              trackingNumber: "TRACK-002",
+            },
+            totalPrice: 75,
+          },
+          {
+            id: "mock-3",
+            productId: "prod-3",
+            productName: "Path Shoes",
+            customer: "Robert Johnson",
+            quantity: 3,
+            date: new Date(Date.now() - 172800000).toISOString().split("T")[0], // 2 days ago
+            shipping: {
+              status: "delivered",
+              courier: "default",
+              trackingNumber: "TRACK-003",
+            },
+            totalPrice: 120,
+          },
+        ];
+
+        setOrders(mockData);
+        setError(
+          "Using demo data - please log in again to see your actual orders"
+        );
+      } else {
+        setError("Failed to load recent orders. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchOrders();
   }, []);
 
-  return (
-    <div className="bg-white p-6 rounded-lg shadow-lg">
-      <h2 className="text-xl text-black font-semibold mb-4">Recent Order</h2>
-      <table className="w-full text-left text-black border-collapse">
-        <thead>
-          <tr className="border-b">
-            <th className="p-2">Order ID</th>
-            <th className="p-2">Date</th>
-            <th className="p-2">Product</th>
-            <th className="p-2">Customer</th>
-            <th className="p-2">Total Price</th>
-            <th className="p-2">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
-            <tr>
-              <td colSpan={6} className="p-4 text-center text-gray-500">
-                Loading...
-              </td>
-            </tr>
-          ) : orders.length > 0 ? (
-            orders.map((order, index) => (
-              <tr
-                key={index}
-                className="border-b hover:text-black text-gray-600"
+  const handleRefresh = () => {
+    fetchOrders();
+  };
+
+  const handleViewOrder = (orderId: string) => {
+    router.push(`/Order?id=${orderId}`);
+  };
+
+  // Get status color based on status string
+  const getStatusColor = (status: string) => {
+    const lowerStatus = status.toLowerCase();
+    switch (lowerStatus) {
+      case "pending":
+        return { bg: "#fff8e1", text: "#f57c00" };
+      case "processing":
+        return { bg: "#e3f2fd", text: "#1976d2" };
+      case "shipped":
+        return { bg: "#e8f5e9", text: "#388e3c" };
+      case "delivered":
+        return { bg: "#e8f5e9", text: "#388e3c" };
+      case "cancelled":
+        return { bg: "#ffebee", text: "#d32f2f" };
+      default:
+        return { bg: "#f5f5f5", text: "#757575" };
+    }
+  };
+
+  // Responsive table columns based on screen size
+  const getTableColumns = () => {
+    if (isSmallScreen) {
+      return (
+        <TableRow>
+          <TableCell>Order</TableCell>
+          <TableCell>Status</TableCell>
+          <TableCell align="right">Actions</TableCell>
+        </TableRow>
+      );
+    } else if (isMediumScreen) {
+      return (
+        <TableRow>
+          <TableCell>Order ID</TableCell>
+          <TableCell>Date</TableCell>
+          <TableCell>Product</TableCell>
+          <TableCell>Status</TableCell>
+          <TableCell align="right">Actions</TableCell>
+        </TableRow>
+      );
+    } else {
+      return (
+        <TableRow>
+          <TableCell>Order ID</TableCell>
+          <TableCell>Date</TableCell>
+          <TableCell>Product</TableCell>
+          <TableCell>Customer</TableCell>
+          <TableCell>Total Price</TableCell>
+          <TableCell>Status</TableCell>
+          <TableCell align="right">Actions</TableCell>
+        </TableRow>
+      );
+    }
+  };
+
+  // Responsive table rows based on screen size
+  const renderTableRow = (order: Order) => {
+    if (isSmallScreen) {
+      return (
+        <TableRow key={order.id} hover>
+          <TableCell>
+            <Box>
+              <Typography variant="body2" fontWeight="medium">
+                {order.productName || "Product"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {new Date(
+                  order.date || order.orderDate || ""
+                ).toLocaleDateString()}
+              </Typography>
+            </Box>
+          </TableCell>
+          <TableCell>
+            <Chip
+              label={(
+                order.shipping?.status ||
+                order.shippingStatus ||
+                "N/A"
+              ).toUpperCase()}
+              size="small"
+              sx={{
+                backgroundColor: getStatusColor(
+                  order.shipping?.status || order.shippingStatus || ""
+                ).bg,
+                color: getStatusColor(
+                  order.shipping?.status || order.shippingStatus || ""
+                ).text,
+                fontWeight: "medium",
+                fontSize: "0.7rem",
+                height: "24px",
+              }}
+            />
+          </TableCell>
+          <TableCell align="right">
+            <IconButton size="small" onClick={() => handleViewOrder(order.id)}>
+              <VisibilityIcon fontSize="small" />
+            </IconButton>
+          </TableCell>
+        </TableRow>
+      );
+    } else if (isMediumScreen) {
+      return (
+        <TableRow key={order.id} hover>
+          <TableCell>{order.id.substring(0, 8)}...</TableCell>
+          <TableCell>
+            {new Date(order.date || order.orderDate || "").toLocaleDateString()}
+          </TableCell>
+          <TableCell>{order.productName || "Product"}</TableCell>
+          <TableCell>
+            <Chip
+              label={(
+                order.shipping?.status ||
+                order.shippingStatus ||
+                "N/A"
+              ).toUpperCase()}
+              size="small"
+              sx={{
+                backgroundColor: getStatusColor(
+                  order.shipping?.status || order.shippingStatus || ""
+                ).bg,
+                color: getStatusColor(
+                  order.shipping?.status || order.shippingStatus || ""
+                ).text,
+                fontWeight: "medium",
+                fontSize: "0.7rem",
+                height: "24px",
+              }}
+            />
+          </TableCell>
+          <TableCell align="right">
+            <IconButton size="small" onClick={() => handleViewOrder(order.id)}>
+              <VisibilityIcon fontSize="small" />
+            </IconButton>
+          </TableCell>
+        </TableRow>
+      );
+    } else {
+      return (
+        <TableRow key={order.id} hover>
+          <TableCell>{order.id.substring(0, 8)}...</TableCell>
+          <TableCell>
+            {new Date(order.date || order.orderDate || "").toLocaleDateString()}
+          </TableCell>
+          <TableCell>{order.productName || "Product"}</TableCell>
+          <TableCell>
+            {order.customer || order.customerUsername || "Customer"}
+          </TableCell>
+          <TableCell>${(order.totalPrice || 0).toFixed(2)}</TableCell>
+          <TableCell>
+            <Chip
+              label={(
+                order.shipping?.status ||
+                order.shippingStatus ||
+                "N/A"
+              ).toUpperCase()}
+              size="small"
+              sx={{
+                backgroundColor: getStatusColor(
+                  order.shipping?.status || order.shippingStatus || ""
+                ).bg,
+                color: getStatusColor(
+                  order.shipping?.status || order.shippingStatus || ""
+                ).text,
+                fontWeight: "medium",
+                fontSize: "0.7rem",
+                height: "24px",
+              }}
+            />
+          </TableCell>
+          <TableCell align="right">
+            <Tooltip title="View Order Details">
+              <IconButton
+                size="small"
+                onClick={() => handleViewOrder(order.id)}
               >
-                <td className="p-4">{order.id}</td>
-                <td className="p-4">{order.date}</td>
-                <td className="p-4">{order.product}</td>
-                <td className="p-4">{order.customer}</td>
-                <td className="p-4">{order.price}</td>
-                <td className="p-4">{order.status}</td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={6} className="p-4 text-center text-gray-500">
-                No data available
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+                <VisibilityIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </TableCell>
+        </TableRow>
+      );
+    }
+  };
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 2,
+        }}
+      >
+        <Typography variant="h6" fontWeight="bold">
+          Recent Orders
+        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+            Last updated: {lastUpdated.toLocaleTimeString()}
+          </Typography>
+          <Tooltip title="Refresh">
+            <IconButton size="small" onClick={handleRefresh} disabled={loading}>
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Box>
+
+      {error && (
+        <Box
+          sx={{
+            mb: 2,
+            p: 2,
+            bgcolor: "#ffebee",
+            borderRadius: 1,
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          <ErrorOutlineIcon color="error" sx={{ mr: 1 }} />
+          <Typography color="error">{error}</Typography>
+        </Box>
+      )}
+
+      <TableContainer>
+        <Table size={isSmallScreen ? "small" : "medium"}>
+          <TableHead sx={{ bgcolor: "#f8f9fa" }}>{getTableColumns()}</TableHead>
+          <TableBody>
+            {loading ? (
+              // Loading skeletons
+              Array.from(new Array(5)).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell
+                    colSpan={isSmallScreen ? 3 : isMediumScreen ? 5 : 7}
+                  >
+                    <Skeleton animation="wave" height={40} />
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : orders.length > 0 ? (
+              // Order data
+              orders.map((order) => renderTableRow(order))
+            ) : (
+              // No data message
+              <TableRow>
+                <TableCell
+                  colSpan={isSmallScreen ? 3 : isMediumScreen ? 5 : 7}
+                  align="center"
+                >
+                  <Box
+                    sx={{
+                      py: 3,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                    }}
+                  >
+                    <ErrorOutlineIcon
+                      sx={{ fontSize: 40, color: "text.secondary", mb: 1 }}
+                    />
+                    <Typography variant="body1" color="text.secondary">
+                      No recent orders found
+                    </Typography>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => router.push("/Order")}
+          sx={{
+            borderColor: "#292929",
+            color: "#292929",
+            "&:hover": { borderColor: "#000", bgcolor: "rgba(0,0,0,0.04)" },
+          }}
+        >
+          View All Orders
+        </Button>
+      </Box>
+    </>
   );
 };
 

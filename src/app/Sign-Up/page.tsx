@@ -1,12 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import type React from "react";
+
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { FaEye, FaEyeSlash } from "react-icons/fa";
 import Link from "next/link";
+import {
+  Box,
+  TextField,
+  Button,
+  Typography,
+  Card,
+  CardContent,
+  Alert,
+  InputAdornment,
+  IconButton,
+  useMediaQuery,
+  useTheme,
+  CircularProgress,
+} from "@mui/material";
+import PersonIcon from "@mui/icons-material/Person";
+import EmailIcon from "@mui/icons-material/Email";
+import LockIcon from "@mui/icons-material/Lock";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 export default function SignUpPage() {
   const router = useRouter();
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
+
   const API_URL = "https://backend-eoq-production.up.railway.app";
 
   const [formData, setFormData] = useState({
@@ -20,6 +43,11 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -30,23 +58,30 @@ export default function SignUpPage() {
     setError("");
     setLoading(true);
 
-    const usernameRegex = /^[a-zA-Z0-9_]+$/;
+    // Username validation
+    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
     if (!usernameRegex.test(formData.username)) {
-      setError("Username hanya boleh berisi huruf, angka, dan underscore (_).");
+      setError(
+        "Username must be 3-20 characters (letters, numbers, underscores)."
+      );
       setLoading(false);
       return;
     }
 
+    // Email validation
     const emailRegex = /^[\w-]+@[\w-]+\.[a-z]{2,}$/;
-    const phoneRegex = /^\d{10,15}$/;
-    if (!emailRegex.test(formData.email) && !phoneRegex.test(formData.email)) {
-      setError("Masukkan email atau nomor telepon yang valid.");
+    if (!emailRegex.test(formData.email)) {
+      setError("Please enter a valid email address.");
       setLoading(false);
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError("Password harus minimal 6 karakter.");
+    // Password validation
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+    if (!passwordRegex.test(formData.password)) {
+      setError(
+        "Password must be at least 8 characters with 1 letter and 1 number."
+      );
       setLoading(false);
       return;
     }
@@ -69,11 +104,10 @@ export default function SignUpPage() {
       });
 
       const data = await response.json();
-      if (!response.ok || !data.success) {
+      if (!response.ok) {
         throw new Error(data.message || "Sign Up failed!");
       }
 
-      alert("Account created successfully! You can now log in.");
       router.push("/");
     } catch (err) {
       setError(
@@ -84,97 +118,197 @@ export default function SignUpPage() {
     }
   };
 
+  if (!isClient) {
+    return null;
+  }
+
   return (
-    <div
-      className="flex flex-col h-screen items-center justify-center relative bg-cover bg-center"
-      style={{ backgroundImage: "url('/Image/SIGN UP.png')" }}
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundImage: "url('/Image/SIGN UP.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        position: "relative",
+        padding: isSmallScreen ? 2 : 4,
+      }}
     >
-      <div className="absolute inset-0 flex justify-center items-center">
-        <div className="w-full h-full bg-black opacity-60"></div>
-      </div>
-      <div className="relative bg-white shadow-2xl rounded-lg p-8 w-[400px] text-black">
-        <h2 className="text-center text-2xl font-semibold mb-6">
-          CREATE ACCOUNT
-        </h2>
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        <form className="space-y-4" onSubmit={handleSignUp}>
-          <div>
-            <label className="text-sm font-semibold">USERNAME:</label>
-            <input
-              type="text"
+      <Box
+        sx={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          zIndex: 0,
+        }}
+      />
+
+      <Card
+        sx={{
+          maxWidth: isSmallScreen ? "100%" : 450,
+          width: "100%",
+          borderRadius: 2,
+          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
+          overflow: "visible",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <CardContent sx={{ p: isSmallScreen ? 3 : 4 }}>
+          <Typography
+            variant="h5"
+            component="h1"
+            align="center"
+            fontWeight="bold"
+            gutterBottom
+          >
+            CREATE ACCOUNT
+          </Typography>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 3, borderRadius: 1 }}>
+              {error}
+            </Alert>
+          )}
+
+          <Box component="form" onSubmit={handleSignUp} sx={{ mt: 2 }}>
+            <TextField
+              fullWidth
+              label="Username"
               name="username"
               value={formData.username}
               onChange={handleChange}
-              className="w-full border-b border-black py-2 focus:outline-none text-black"
+              margin="normal"
               required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonIcon color="action" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 2 }}
+              helperText="Username must be 3-20 characters (letters, numbers, underscores)"
             />
-          </div>
-          <div>
-            <label className="text-sm font-semibold">EMAIL/TELEPON:</label>
-            <input
-              type="text"
+
+            <TextField
+              fullWidth
+              label="Email"
               name="email"
+              type="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full border-b border-black py-2 focus:outline-none text-black"
+              margin="normal"
               required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <EmailIcon color="action" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 2 }}
             />
-          </div>
-          <div className="relative">
-            <label className="text-sm font-semibold">PASSWORD:</label>
-            <input
-              type={showPassword ? "text" : "password"}
+
+            <TextField
+              fullWidth
+              label="Password"
               name="password"
+              type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={handleChange}
-              className="w-full border-b border-black py-2 focus:outline-none text-black pr-10"
+              margin="normal"
               required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LockIcon color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 2 }}
+              helperText="Password must be at least 8 characters with 1 letter and 1 number"
             />
-            <button
-              type="button"
-              className="absolute right-2 top-8 text-gray-500"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
-            </button>
-          </div>
-          <div className="relative">
-            <label className="text-sm font-semibold">CONFIRM PASSWORD:</label>
-            <input
-              type={showConfirmPassword ? "text" : "password"}
+
+            <TextField
+              fullWidth
+              label="Confirm Password"
               name="confirmPassword"
+              type={showConfirmPassword ? "text" : "password"}
               value={formData.confirmPassword}
               onChange={handleChange}
-              className="w-full border-b border-black py-2 focus:outline-none text-black pr-10"
+              margin="normal"
               required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LockIcon color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                      edge="end"
+                    >
+                      {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 3 }}
             />
-            <button
-              type="button"
-              className="absolute right-2 top-8 text-gray-500"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              disabled={loading}
+              sx={{
+                py: 1.5,
+                bgcolor: "#292929",
+                color: "white",
+                "&:hover": { bgcolor: "#444" },
+                borderRadius: "8px",
+              }}
             >
-              {showConfirmPassword ? (
-                <FaEyeSlash size={20} />
+              {loading ? (
+                <CircularProgress size={24} color="inherit" />
               ) : (
-                <FaEye size={20} />
+                "SIGN UP"
               )}
-            </button>
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-black text-white py-2 rounded-lg hover:bg-gray-800"
-            disabled={loading}
-          >
-            {loading ? "Signing Up..." : "SIGN UP"}
-          </button>
-        </form>
-        <p className="text-center text-sm text-gray-600 mt-4">
-          Already have an account?{" "}
-          <Link href="/" className="text-blue-500 hover:underline">
-            Login
-          </Link>
-        </p>
-      </div>
-    </div>
+            </Button>
+
+            <Typography variant="body2" align="center" sx={{ mt: 3 }}>
+              Already have an account?{" "}
+              <Link
+                href="/"
+                style={{ color: "#1976d2", textDecoration: "none" }}
+              >
+                Login
+              </Link>
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
   );
 }

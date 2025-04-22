@@ -1,39 +1,65 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import axios, { AxiosResponse } from "axios";
-import { FaArrowUp, FaArrowDown } from "react-icons/fa";
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  Typography,
+  Box,
+  Skeleton,
+  useMediaQuery,
+  useTheme,
+} from "@mui/material";
+import PeopleIcon from "@mui/icons-material/People";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import TrendingDownIcon from "@mui/icons-material/TrendingDown";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  type ChartData,
+  type ChartOptions,
+} from "chart.js";
 import { Doughnut } from "react-chartjs-2";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 
-// Registrasi Chart.js
+// Register ChartJS components
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-interface CustomerStats {
-  totalCustomers: number | null;
-  newCustomers: number | null;
-  percentageChange: number | null;
-}
-
-const TotalCustomerStatCard: React.FC = () => {
+const TotalCustomerStatCard = () => {
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const [totalCustomers, setTotalCustomers] = useState<number | null>(null);
   const [newCustomers, setNewCustomers] = useState<number | null>(null);
-  const [percentageChange, setPercentageChange] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [percentChange, setPercentChange] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    axios
-      .get<CustomerStats>("https://api.example.com/customers/statistics")
-      .then((response: AxiosResponse<CustomerStats>) => {
-        const data = response.data;
-        setTotalCustomers(data.totalCustomers ?? null);
-        setNewCustomers(data.newCustomers ?? null);
-        setPercentageChange(data.percentageChange ?? null);
-      })
-      .catch((error: unknown) => {
-        console.error("Error fetching data:", error);
-      })
-      .finally(() => setIsLoading(false));
+    // Simulate API call
+    const fetchCustomerStats = async () => {
+      try {
+        setLoading(true);
+        // In a real app, you would fetch from your API
+        // const response = await axios.get('/api/customers/stats')
+
+        // Simulated data
+        setTimeout(() => {
+          const mockTotal = 42;
+          const mockNew = 8;
+          const mockChange = 5.2;
+
+          setTotalCustomers(mockTotal);
+          setNewCustomers(mockNew);
+          setPercentChange(mockChange);
+          setLoading(false);
+        }, 1000);
+      } catch (error) {
+        console.error("Error fetching customer stats:", error);
+        setLoading(false);
+      }
+    };
+
+    fetchCustomerStats();
   }, []);
 
   const loyalCustomers =
@@ -41,87 +67,197 @@ const TotalCustomerStatCard: React.FC = () => {
       ? totalCustomers - newCustomers
       : null;
 
-  const isPositive = (percentageChange ?? 0) >= 0;
-  const arrowIcon = isPositive ? (
-    <FaArrowUp className="text-green-500" />
-  ) : (
-    <FaArrowDown className="text-red-500" />
-  );
-  const textColor = isPositive ? "text-green-600" : "text-red-600";
-
-  const chartData = {
-    labels: ["New Customer", "Loyal Customer"],
+  // Chart data and options with proper typing
+  const chartData: ChartData<"doughnut"> = {
+    labels: ["New Customers", "Loyal Customers"],
     datasets: [
       {
-        data:
-          newCustomers !== null && loyalCustomers !== null
-            ? [newCustomers, loyalCustomers]
-            : [],
-        backgroundColor: ["#A3A3A3", "#1F1F1F"],
-        hoverBackgroundColor: ["#8D8D8D", "#000000"],
+        data: [newCustomers || 0, loyalCustomers || 0],
+        backgroundColor: ["#f57c00", "#333333"],
+        hoverBackgroundColor: ["#ef6c00", "#1f1f1f"],
+        borderWidth: 0,
+        // Remove cutout from here - it should be in options
       },
     ],
   };
 
-  const chartOptions = {
+  const chartOptions: ChartOptions<"doughnut"> = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
+    cutout: "75%", // Move cutout here in the options
+    plugins: {
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        backgroundColor: "#333",
+        titleColor: "#fff",
+        bodyColor: "#fff",
+        titleFont: {
+          size: 13,
+          weight: "bold",
+        },
+        bodyFont: {
+          size: 12,
+        },
+        padding: 10,
+        displayColors: true,
+        callbacks: {
+          label: (context: any) => {
+            const label = context.label || "";
+            const value = context.raw || 0;
+            const total = context.dataset.data.reduce(
+              (a: number, b: number) => a + b,
+              0
+            );
+            const percentage = Math.round((value / total) * 100);
+            return `${label}: ${value} (${percentage}%)`;
+          },
+        },
+      },
+    },
+    animation: {
+      animateRotate: true,
+      animateScale: true,
+    },
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-4 rounded-lg shadow-lg bg-white border border-gray-300 flex justify-center items-center h-24">
-        <p className="text-gray-500">Loading Total Customer Data...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4 rounded-lg shadow-lg bg-white border border-gray-300 flex flex-col">
-      <h3 className="text-lg text-black font-semibold">Total Customer</h3>
+    <Card
+      elevation={0}
+      sx={{
+        height: "100%",
+        borderRadius: 2,
+        transition: "transform 0.3s, box-shadow 0.3s",
+        "&:hover": {
+          transform: "translateY(-5px)",
+          boxShadow: "0 10px 20px rgba(0,0,0,0.1)",
+        },
+      }}
+    >
+      <CardContent sx={{ p: isSmallScreen ? 2 : 3 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            mb: 2,
+          }}
+        >
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              Total Customers
+            </Typography>
+            {loading ? (
+              <Skeleton variant="text" width={100} height={40} />
+            ) : (
+              <Typography
+                variant={isSmallScreen ? "h5" : "h4"}
+                fontWeight="bold"
+              >
+                {totalCustomers !== null ? totalCustomers : "N/A"}
+              </Typography>
+            )}
+          </Box>
+          <Box
+            sx={{
+              bgcolor: "#fff8e1",
+              borderRadius: "50%",
+              width: 48,
+              height: 48,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <PeopleIcon sx={{ color: "#f57c00" }} />
+          </Box>
+        </Box>
 
-      {/* Total Customer Number */}
-      <p className={`text-3xl font-bold ${textColor}`}>
-        {totalCustomers !== null
-          ? totalCustomers.toLocaleString()
-          : "No data available"}
-      </p>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+          {percentChange >= 0 ? (
+            <TrendingUpIcon sx={{ color: "#388e3c", fontSize: 16, mr: 0.5 }} />
+          ) : (
+            <TrendingDownIcon
+              sx={{ color: "#d32f2f", fontSize: 16, mr: 0.5 }}
+            />
+          )}
+          <Typography
+            variant="caption"
+            color={percentChange >= 0 ? "#388e3c" : "#d32f2f"}
+            fontWeight="medium"
+          >
+            {newCustomers !== null ? `${newCustomers} new customers` : ""}
+            {percentChange >= 0 ? " +" : " "}
+            {percentChange}% from last month
+          </Typography>
+        </Box>
 
-      {/* Percentage Change Text */}
-      <p
-        className={`flex items-center space-x-1 ${textColor} text-md font-medium`}
-      >
-        {arrowIcon}
-        <span>
-          {newCustomers !== null && percentageChange !== null
-            ? `${newCustomers.toLocaleString()} new customer (${percentageChange}%)`
-            : "No data available"}
-        </span>
-        <span className="text-gray-500">vs last month</span>
-      </p>
+        {/* Chart */}
+        <Box
+          sx={{
+            height: 120,
+            position: "relative",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {loading ? (
+            <Skeleton variant="circular" width={120} height={120} />
+          ) : (
+            <>
+              <Box
+                sx={{
+                  position: "absolute",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  New
+                </Typography>
+                <Typography variant="h6" fontWeight="bold">
+                  {newCustomers !== null &&
+                  totalCustomers !== null &&
+                  totalCustomers > 0
+                    ? `${Math.round((newCustomers / totalCustomers) * 100)}%`
+                    : "N/A"}
+                </Typography>
+              </Box>
+              <Doughnut data={chartData} options={chartOptions} />
+            </>
+          )}
+        </Box>
 
-      {/* Grafik Donut */}
-      <div className="h-32 w-32 mx-auto mt-4">
-        {newCustomers !== null && loyalCustomers !== null ? (
-          <Doughnut data={chartData} options={chartOptions} />
-        ) : (
-          <p className="text-gray-500 text-center">No data available</p>
-        )}
-      </div>
-
-      {/* Legend */}
-      <div className="mt-4 flex justify-center items-center space-x-4 text-sm">
-        <div className="flex items-center space-x-2">
-          <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
-          <span className="text-black">New Customer</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className="w-3 h-3 bg-black rounded-full"></div>
-          <span className="text-black">Loyal Customer</span>
-        </div>
-      </div>
-    </div>
+        {/* Legend */}
+        <Box sx={{ display: "flex", justifyContent: "center", gap: 3, mt: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box
+              sx={{
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                bgcolor: "#f57c00",
+              }}
+            />
+            <Typography variant="caption">New</Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box
+              sx={{
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                bgcolor: "#333333",
+              }}
+            />
+            <Typography variant="caption">Loyal</Typography>
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
 
