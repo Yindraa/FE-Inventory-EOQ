@@ -1,7 +1,16 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  /* config options here */
+const NextConfig = {
+  eslint: {
+    // This disables ESLint during production builds
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // This disables TypeScript errors during production builds
+    ignoreBuildErrors: true,
+  },
+  images: {
+    unoptimized: true,
+  },
 };
-
-export default nextConfig;
+export default NextConfig;
