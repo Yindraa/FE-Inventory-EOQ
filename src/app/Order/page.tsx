@@ -8,7 +8,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   TextField,
   IconButton,
   Button,
@@ -29,7 +28,6 @@ import {
   Card,
   CardContent,
   Divider,
-  InputAdornment,
   Badge,
   LinearProgress,
 } from "@mui/material";
@@ -39,32 +37,34 @@ import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoIcon from "@mui/icons-material/Info";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import SortIcon from "@mui/icons-material/Sort";
 import axios from "axios";
 import LeftSidebar from "../components/LeftSidebar";
 import { useRouter } from "next/navigation";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
-// Updated Shipping interface to make courier and trackingNumber required
+// Updated Shipping interface to match backend
 interface Shipping {
   status: string;
-  courier: string; // Required field
-  trackingNumber: string; // Required field
+  courier: string;
+  trackingNumber: string;
   id?: string;
   estimatedDate?: string;
+  customerName?: string; // Added to match backend
 }
 
+// Updated Order interface to match backend
 interface Order {
   id: string;
   productId: string;
   productName?: string;
   quantity: number;
-  customer: string;
-  customerUsername?: string;
+  customer?: string; // Keep for backward compatibility
+  customerName?: string; // Added to match backend
   date: string;
   orderDate?: string;
   shipping: Shipping;
   shippingStatus?: string;
+  totalPrice?: number;
 }
 
 interface Product {
@@ -226,7 +226,7 @@ export default function OrderPage() {
     });
   };
 
-  // Update fetchOrders to use enhanced error handling
+  // Update fetchOrders to use enhanced error handling and match backend changes
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -246,17 +246,18 @@ export default function OrderPage() {
         id: item.id,
         productId: item.productId || "",
         productName: item.productName || "",
-        customer: item.customerUsername || "",
-        customerUsername: item.customerUsername || "",
+        customerName: item.customerName || "",
         quantity: item.quantity,
         date: item.orderDate?.split("T")[0] || "",
         orderDate: item.orderDate,
+        totalPrice: item.totalPrice || 0,
         shipping: {
           status: item.shippingStatus?.toLowerCase() || "pending",
-          courier: "default", // Always provide a default value
-          trackingNumber: "TRACK-000", // Always provide a default value
+          courier: "default",
+          trackingNumber: "TRACK-000",
+          customerName: item.customerName || "",
         },
-        shippingStatus: item.shippingStatus,
+        shippingStatus: item.shippingStatus?.toLowerCase() || "pending", // Ensure we're using lowercase
       }));
 
       console.log("Mapped orders data:", mappedData);
@@ -271,7 +272,7 @@ export default function OrderPage() {
 
       if (errorInfo.isAuthError) {
         setError("Your session has expired. Please log in again.");
-        router.push("/");
+        router.push("/login");
       } else if (errorInfo.isNetworkError) {
         setError(
           "Network error: Unable to connect to the server. Please check your internet connection."
@@ -304,7 +305,7 @@ export default function OrderPage() {
       console.error("Failed to fetch products:", errorInfo);
 
       if (errorInfo.isAuthError) {
-        router.push("/");
+        router.push("/login");
       } else {
         showNotification(
           `Failed to load products: ${errorInfo.message}`,
@@ -342,17 +343,49 @@ export default function OrderPage() {
       if (isEditing) {
         // For updating an order, we need status and/or quantity
         orderData = {
-          status: editingOrder.shipping?.status,
+          status: editingOrder.shipping?.status?.toLowerCase(), // Ensure lowercase status
           quantity: Number(editingOrder.quantity),
         };
 
         console.log("Update order data:", orderData);
+
+        // Make the API call
+        const response = await axios.patch(
+          `https://backend-eoq-production.up.railway.app/orders/${editingOrder.id}`,
+          orderData,
+          { withCredentials: true }
+        );
+
+        console.log("Update response:", response.data);
+
+        // After successful update, also update the shipping status if needed
+        try {
+          // Get the shipping ID from the response or find it in our data
+          const shippingId =
+            response.data?.shipping?.id ||
+            data.find((order) => order.id === editingOrder.id)?.shipping?.id;
+
+          if (shippingId) {
+            // Update the shipping status to match the order status
+            await axios.put(
+              `https://backend-eoq-production.up.railway.app/shipping/${shippingId}`,
+              {
+                status: editingOrder.shipping?.status?.toLowerCase(),
+              },
+              { withCredentials: true }
+            );
+            console.log("Shipping status updated to match order status");
+          }
+        } catch (shippingError) {
+          console.error("Failed to update shipping status:", shippingError);
+          // Don't show error to user, just log it
+        }
       } else {
-        // For creating an order, we need productId and quantity
-        // Note: Customer field is ignored by the backend
+        // For creating an order, we need productId, quantity, and customerName
         orderData = {
           productId: editingOrder.productId,
           quantity: Number(editingOrder.quantity),
+          customerName: editingOrder.customerName || "Customer", // Use customerName field
         };
 
         console.log("Create order data:", orderData);
@@ -362,6 +395,7 @@ export default function OrderPage() {
 
       // Choose endpoint
       if (isEditing) {
+        // Replace the commented-out section with this active code
         const response = await axios.patch(
           `https://backend-eoq-production.up.railway.app/orders/${editingOrder.id}`,
           orderData,
@@ -427,8 +461,7 @@ export default function OrderPage() {
               id: newestOrder.id,
               productId: newestOrder.productId || "",
               productName: newestOrder.productName || "",
-              customer: newestOrder.customerUsername || "",
-              customerUsername: newestOrder.customerUsername || "",
+              customerName: newestOrder.customerName || "", // Use customerName from backend
               quantity: newestOrder.quantity,
               date: newestOrder.orderDate?.split("T")[0] || "",
               orderDate: newestOrder.orderDate,
@@ -436,6 +469,7 @@ export default function OrderPage() {
                 status: newestOrder.shippingStatus?.toLowerCase() || "pending",
                 courier: "default",
                 trackingNumber: "TRACK-000",
+                customerName: newestOrder.customerName || "", // Add customerName to shipping
               },
               shippingStatus: newestOrder.shippingStatus,
             };
@@ -474,7 +508,7 @@ export default function OrderPage() {
         }
       } else if (errorInfo.isAuthError) {
         setError("Authentication error: Please log in again");
-        router.push("/");
+        router.push("/login");
       } else if (errorInfo.isServerError) {
         setError(
           `Server error (${errorInfo.status}): ${errorInfo.message}. Our team has been notified.`
@@ -499,7 +533,7 @@ export default function OrderPage() {
       id: order.id,
       productId: order.productId,
       quantity: order.quantity,
-      customer: order.customer || order.customerUsername,
+      customerName: order.customerName || order.customer || "", // Use customerName with fallback
       date: order.date || order.orderDate?.split("T")[0],
       shipping: {
         status:
@@ -508,6 +542,7 @@ export default function OrderPage() {
           "pending",
         courier: order.shipping?.courier || "default", // Always provide a default value
         trackingNumber: order.shipping?.trackingNumber || "TRACK-000", // Always provide a default value
+        customerName: order.customerName || order.customer || "", // Add customerName to shipping
       },
     });
   };
@@ -521,7 +556,7 @@ export default function OrderPage() {
     setEditingOrder({
       productId: products[0]?.id ? String(products[0].id) : "",
       quantity: 1,
-      customer: "", // This field is ignored by the backend
+      customerName: "", // Use customerName field
       date: new Date().toISOString().split("T")[0],
       shipping: {
         courier: "default",
@@ -558,7 +593,7 @@ export default function OrderPage() {
         fetchOrders();
       } else if (errorInfo.isAuthError) {
         setError("Authentication error: Please log in again");
-        router.push("/");
+        router.push("/login");
       } else if (errorInfo.isServerError) {
         setError(
           `Server error (${errorInfo.status}): ${errorInfo.message}. Our team has been notified.`
@@ -730,7 +765,7 @@ export default function OrderPage() {
           <TableCell>
             {row.productName || getProductName(row.productId || "")}
           </TableCell>
-          <TableCell>{row.customer || row.customerUsername || "N/A"}</TableCell>
+          <TableCell>{row.customerName || row.customer || "N/A"}</TableCell>
           <TableCell>{row.quantity || 0}</TableCell>
           <TableCell>
             <Chip
@@ -786,7 +821,7 @@ export default function OrderPage() {
           <TableCell>
             {row.productName || getProductName(row.productId || "")}
           </TableCell>
-          <TableCell>{row.customer || row.customerUsername || "N/A"}</TableCell>
+          <TableCell>{row.customerName || row.customer || "N/A"}</TableCell>
           <TableCell>{row.quantity || 0}</TableCell>
           <TableCell>
             <Chip
@@ -863,18 +898,35 @@ export default function OrderPage() {
       >
         <Card elevation={0} sx={{ mb: 3, borderRadius: 2 }}>
           <CardContent>
-            <Typography
-              variant={isSmallScreen ? "h5" : "h4"}
-              fontWeight="bold"
-              color="text.primary"
-              gutterBottom
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
             >
-              Order Management
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              View, create, and manage your orders. Track status and update
-              order information.
-            </Typography>
+              <div>
+                <Typography
+                  variant={isSmallScreen ? "h5" : "h4"}
+                  fontWeight="bold"
+                  color="text.primary"
+                  gutterBottom
+                >
+                  Order Management
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  View, create, and manage your orders. Track status and update
+                  order information.
+                </Typography>
+              </div>
+              <IconButton
+                onClick={() => fetchOrders()}
+                disabled={loading}
+                title="Refresh Orders"
+              >
+                <RefreshIcon />
+              </IconButton>
+            </Box>
           </CardContent>
         </Card>
 
@@ -893,7 +945,7 @@ export default function OrderPage() {
                 <Button
                   color="inherit"
                   size="small"
-                  onClick={() => router.push("/")}
+                  onClick={() => router.push("/login")}
                 >
                   Login
                 </Button>
@@ -1236,23 +1288,23 @@ export default function OrderPage() {
                   </Select>
                 </FormControl>
 
-                {/* Added back the customer field with a note that it's ignored by the backend */}
+                {/* Updated to use customerName field */}
                 <FormControl fullWidth margin="normal" sx={{ mb: 2 }}>
                   <TextField
                     fullWidth
-                    label="Customer"
-                    value={editingOrder?.customer || ""}
+                    label="Customer Name"
+                    value={editingOrder?.customerName || ""}
                     onChange={(e) =>
                       setEditingOrder({
                         ...editingOrder,
-                        customer: e.target.value,
+                        customerName: e.target.value,
                       })
                     }
                     disabled={loading}
                     size={isSmallScreen ? "small" : "medium"}
                     InputProps={{
                       endAdornment: (
-                        <Tooltip title="This field is for display only. The system will use your account username regardless of what you enter here.">
+                        <Tooltip title="Enter the customer's name for this order">
                           <InfoIcon
                             color="info"
                             fontSize="small"
@@ -1261,7 +1313,7 @@ export default function OrderPage() {
                         </Tooltip>
                       ),
                     }}
-                    helperText="Note: System will use your account username regardless of input"
+                    helperText="Enter the customer's name for this order"
                   />
                 </FormControl>
               </>
@@ -1306,6 +1358,7 @@ export default function OrderPage() {
                         courier: editingOrder?.shipping?.courier || "default",
                         trackingNumber:
                           editingOrder?.shipping?.trackingNumber || "TRACK-000",
+                        customerName: editingOrder?.customerName || "", // Add customerName
                       },
                     });
                   }}

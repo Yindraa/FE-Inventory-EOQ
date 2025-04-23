@@ -8,7 +8,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   TextField,
   IconButton,
   Button,
@@ -28,7 +27,6 @@ import {
   Card,
   CardContent,
   Divider,
-  InputAdornment,
   Badge,
   LinearProgress,
   Tooltip,
@@ -36,13 +34,12 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import SearchIcon from "@mui/icons-material/Search";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
-import InfoIcon from "@mui/icons-material/Info";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
-import FilterListIcon from "@mui/icons-material/FilterList";
 import axios from "axios";
 import LeftSidebar from "../components/LeftSidebar";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
-// Match the backend entity structure
+// Updated to match backend entity
 interface Shipping {
   id: string;
   courier: string;
@@ -50,7 +47,8 @@ interface Shipping {
   status: string;
   estimatedDate: string;
   orderId?: string;
-  customer?: string;
+  customer_username?: string; // Updated to match backend
+  customerName?: string; // Added for compatibility
   totalPrice?: number;
 }
 
@@ -130,13 +128,14 @@ export default function ShippingPage() {
       const mappedData: Shipping[] = (response.data || []).map((item: any) => ({
         id: item.id,
         courier: item.courier || "",
-        trackingNumber: item.tracking_number || "",
-        status: item.status?.toLowerCase() || "pending",
+        trackingNumber: item.tracking_number || item.trackingNumber || "",
+        status: item.status?.toLowerCase() || "pending", // Ensure lowercase status
         estimatedDate: item.estimated_date
           ? item.estimated_date.split("T")[0]
-          : "",
+          : item.estimatedDate || "",
         orderId: item.order_id,
-        customer: item.customer || "",
+        customer_username: item.customer_username || "", // Use customer_username from backend
+        customerName: item.customer_name || "", // Use customer_name as fallback
         totalPrice: item.total_price || 0,
       }));
 
@@ -191,7 +190,7 @@ export default function ShippingPage() {
       if (isEditing && editingShipping.id) {
         // Create update DTO that matches backend expectations
         const updateDto: UpdateShippingDto = {
-          status: editingShipping.status,
+          status: editingShipping.status?.toLowerCase(), // Ensure lowercase status
           courier: editingShipping.courier,
         };
 
@@ -203,6 +202,24 @@ export default function ShippingPage() {
             withCredentials: true,
           }
         );
+
+        // After successful update, also update the order status if needed
+        try {
+          // If we have the orderId, update the order status to match
+          if (editingShipping.orderId) {
+            await axios.patch(
+              `https://backend-eoq-production.up.railway.app/orders/${editingShipping.orderId}`,
+              {
+                status: editingShipping.status?.toLowerCase(),
+              },
+              { withCredentials: true }
+            );
+            console.log("Order status updated to match shipping status");
+          }
+        } catch (orderError) {
+          console.error("Failed to update order status:", orderError);
+          // Don't show error to user, just log it
+        }
 
         // Optimistic update
         setData((prevData) =>
@@ -254,7 +271,8 @@ export default function ShippingPage() {
       status: shipping.status,
       estimatedDate: shipping.estimatedDate,
       orderId: shipping.orderId,
-      customer: shipping.customer,
+      customer_username: shipping.customer_username,
+      customerName: shipping.customerName,
       totalPrice: shipping.totalPrice,
     });
   };
@@ -275,7 +293,10 @@ export default function ShippingPage() {
       row.courier.toLowerCase().includes(searchTermLower) ||
       (row.trackingNumber &&
         row.trackingNumber.toLowerCase().includes(searchTermLower)) ||
-      (row.customer && row.customer.toLowerCase().includes(searchTermLower))
+      (row.customer_username &&
+        row.customer_username.toLowerCase().includes(searchTermLower)) ||
+      (row.customerName &&
+        row.customerName.toLowerCase().includes(searchTermLower))
     );
   });
 
@@ -338,6 +359,9 @@ export default function ShippingPage() {
 
   // Responsive table rows based on screen size
   const renderTableRow = (row: Shipping) => {
+    // Get customer name from either customer_username or customerName
+    const customerDisplay = row.customer_username || row.customerName || "N/A";
+
     if (isSmallScreen) {
       return (
         <>
@@ -352,13 +376,13 @@ export default function ShippingPage() {
             >
               {row.trackingNumber}
             </Typography>
-            {row.customer && (
+            {customerDisplay && (
               <Typography
                 variant="caption"
                 display="block"
                 color="text.secondary"
               >
-                {row.customer}
+                {customerDisplay}
               </Typography>
             )}
           </TableCell>
@@ -391,7 +415,7 @@ export default function ShippingPage() {
         <>
           <TableCell>{row.courier}</TableCell>
           <TableCell>{row.trackingNumber}</TableCell>
-          <TableCell>{row.customer || "N/A"}</TableCell>
+          <TableCell>{customerDisplay}</TableCell>
           <TableCell>
             <Chip
               label={(row.status || "pending").toUpperCase()}
@@ -424,7 +448,7 @@ export default function ShippingPage() {
           </TableCell>
           <TableCell>{row.courier}</TableCell>
           <TableCell>{row.trackingNumber}</TableCell>
-          <TableCell>{row.customer || "N/A"}</TableCell>
+          <TableCell>{customerDisplay}</TableCell>
           <TableCell>
             <Chip
               label={(row.status || "pending").toUpperCase()}
@@ -486,18 +510,35 @@ export default function ShippingPage() {
       >
         <Card elevation={0} sx={{ mb: 3, borderRadius: 2 }}>
           <CardContent>
-            <Typography
-              variant={isSmallScreen ? "h5" : "h4"}
-              fontWeight="bold"
-              color="text.primary"
-              gutterBottom
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
             >
-              Shipping Management
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Track and manage shipping details for your orders. Update courier
-              information and delivery status.
-            </Typography>
+              <div>
+                <Typography
+                  variant={isSmallScreen ? "h5" : "h4"}
+                  fontWeight="bold"
+                  color="text.primary"
+                  gutterBottom
+                >
+                  Shipping Management
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Track and manage shipping details for your orders. Update
+                  courier information and delivery status.
+                </Typography>
+              </div>
+              <IconButton
+                onClick={() => fetchShippingData()}
+                disabled={loading}
+                title="Refresh Shipping Data"
+              >
+                <RefreshIcon />
+              </IconButton>
+            </Box>
           </CardContent>
         </Card>
 

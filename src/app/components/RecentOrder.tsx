@@ -32,7 +32,7 @@ interface Order {
   productId: string;
   productName?: string;
   customer: string;
-  customerUsername?: string;
+  customerName?: string;
   quantity: number;
   date: string;
   orderDate?: string;
@@ -66,60 +66,14 @@ const RecentOrder: React.FC = () => {
       const token = localStorage.getItem("token");
 
       if (!token) {
-        console.warn("No authentication token found, using mock data");
-        // Use mock data if no token is available
-        const mockData = [
-          {
-            id: "mock-1",
-            productId: "prod-1",
-            productName: "Dolan Watch",
-            customer: "John Doe",
-            quantity: 2,
-            date: new Date().toISOString().split("T")[0],
-            shipping: {
-              status: "pending",
-              courier: "default",
-              trackingNumber: "TRACK-001",
-            },
-            totalPrice: 50,
-          },
-          {
-            id: "mock-2",
-            productId: "prod-2",
-            productName: "Sisy Bag",
-            customer: "Jane Smith",
-            quantity: 1,
-            date: new Date(Date.now() - 86400000).toISOString().split("T")[0], // Yesterday
-            shipping: {
-              status: "shipped",
-              courier: "default",
-              trackingNumber: "TRACK-002",
-            },
-            totalPrice: 75,
-          },
-          {
-            id: "mock-3",
-            productId: "prod-3",
-            productName: "Path Shoes",
-            customer: "Robert Johnson",
-            quantity: 3,
-            date: new Date(Date.now() - 172800000).toISOString().split("T")[0], // 2 days ago
-            shipping: {
-              status: "delivered",
-              courier: "default",
-              trackingNumber: "TRACK-003",
-            },
-            totalPrice: 120,
-          },
-        ];
-
-        setOrders(mockData);
-        setLastUpdated(new Date());
+        console.warn("No authentication token found");
         setLoading(false);
+        // Don't set an error, just show empty state
+        setOrders([]);
         return;
       }
 
-      // If we have a token, try to fetch real data
+      // Fetch real data with authentication
       const response = await axios.get(
         "https://backend-eoq-production.up.railway.app/orders",
         {
@@ -130,15 +84,22 @@ const RecentOrder: React.FC = () => {
         }
       );
 
-      console.log("Raw orders data from API:", response.data);
+      console.log("RecentOrder - Raw orders data from API:", response.data);
+
+      if (!response.data || response.data.length === 0) {
+        // No orders found, but this is not an error
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
 
       // Map the API response to our Order interface
       const mappedData: Order[] = (response.data || []).map((item: any) => ({
         id: item.id,
         productId: item.productId || "",
         productName: item.productName || "",
-        customer: item.customerUsername || "",
-        customerUsername: item.customerUsername || "",
+        customer: item.customerName || "",
+        customerName: item.customerName || "",
         quantity: item.quantity,
         date: item.orderDate?.split("T")[0] || "",
         orderDate: item.orderDate,
@@ -147,9 +108,9 @@ const RecentOrder: React.FC = () => {
           courier: "default",
           trackingNumber: "TRACK-000",
         },
-        shippingStatus: item.shippingStatus,
-        // Calculate a mock total price based on quantity (in a real app, this would come from the API)
-        totalPrice: item.quantity * 25, // Mock price of $25 per unit
+        shippingStatus: item.shippingStatus?.toLowerCase() || "pending",
+        // Calculate total price based on quantity (in a real app, this would come from the API)
+        totalPrice: item.totalPrice || item.quantity * 25, // Use API totalPrice or fallback to mock calculation
       }));
 
       // Sort by date (newest first) and take the top 5
@@ -164,62 +125,8 @@ const RecentOrder: React.FC = () => {
     } catch (error) {
       console.error("Error fetching orders:", error);
 
-      // Check if it's an authentication error
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
-        console.warn("Authentication error, using mock data instead");
-        // Use mock data on auth error
-        const mockData = [
-          {
-            id: "mock-1",
-            productId: "prod-1",
-            productName: "Dolan Watch",
-            customer: "John Doe",
-            quantity: 2,
-            date: new Date().toISOString().split("T")[0],
-            shipping: {
-              status: "pending",
-              courier: "default",
-              trackingNumber: "TRACK-001",
-            },
-            totalPrice: 50,
-          },
-          {
-            id: "mock-2",
-            productId: "prod-2",
-            productName: "Sisy Bag",
-            customer: "Jane Smith",
-            quantity: 1,
-            date: new Date(Date.now() - 86400000).toISOString().split("T")[0], // Yesterday
-            shipping: {
-              status: "shipped",
-              courier: "default",
-              trackingNumber: "TRACK-002",
-            },
-            totalPrice: 75,
-          },
-          {
-            id: "mock-3",
-            productId: "prod-3",
-            productName: "Path Shoes",
-            customer: "Robert Johnson",
-            quantity: 3,
-            date: new Date(Date.now() - 172800000).toISOString().split("T")[0], // 2 days ago
-            shipping: {
-              status: "delivered",
-              courier: "default",
-              trackingNumber: "TRACK-003",
-            },
-            totalPrice: 120,
-          },
-        ];
-
-        setOrders(mockData);
-        setError(
-          "Using demo data - please log in again to see your actual orders"
-        );
-      } else {
-        setError("Failed to load recent orders. Please try again.");
-      }
+      // Don't show error messages, just show empty state
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -381,7 +288,7 @@ const RecentOrder: React.FC = () => {
           </TableCell>
           <TableCell>{order.productName || "Product"}</TableCell>
           <TableCell>
-            {order.customer || order.customerUsername || "Customer"}
+            {order.customer || order.customerName || "Customer"}
           </TableCell>
           <TableCell>${(order.totalPrice || 0).toFixed(2)}</TableCell>
           <TableCell>
@@ -445,22 +352,6 @@ const RecentOrder: React.FC = () => {
         </Box>
       </Box>
 
-      {error && (
-        <Box
-          sx={{
-            mb: 2,
-            p: 2,
-            bgcolor: "#ffebee",
-            borderRadius: 1,
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          <ErrorOutlineIcon color="error" sx={{ mr: 1 }} />
-          <Typography color="error">{error}</Typography>
-        </Box>
-      )}
-
       <TableContainer>
         <Table size={isSmallScreen ? "small" : "medium"}>
           <TableHead sx={{ bgcolor: "#f8f9fa" }}>{getTableColumns()}</TableHead>
@@ -499,6 +390,13 @@ const RecentOrder: React.FC = () => {
                     />
                     <Typography variant="body1" color="text.secondary">
                       No recent orders found
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 1 }}
+                    >
+                      Create an order to see it here
                     </Typography>
                   </Box>
                 </TableCell>
