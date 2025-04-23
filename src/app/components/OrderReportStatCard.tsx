@@ -94,7 +94,7 @@ const OrderReportStatCard = () => {
 
   useEffect(() => {
     fetchRevenueData(timeFilter);
-  }, []);
+  }, [timeFilter]);
 
   // Chart data and options with proper typing
   const chartData: ChartData<"doughnut"> = {
