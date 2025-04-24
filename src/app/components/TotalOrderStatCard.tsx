@@ -46,6 +46,7 @@ const TotalOrderStatCard = () => {
   const [error, setError] = useState<string | null>(null);
   const [orderTrend, setOrderTrend] = useState<number[]>([]);
   const [percentChange, setPercentChange] = useState<number>(0);
+  const [chartInitialized, setChartInitialized] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchOrderStats = async () => {
@@ -77,16 +78,39 @@ const TotalOrderStatCard = () => {
         const change =
           lastMonth > 0 ? ((currentMonth - lastMonth) / lastMonth) * 100 : 0;
         setPercentChange(Number.parseFloat(change.toFixed(1)));
+
+        // Set chart as initialized
+        setChartInitialized(true);
       } catch (error) {
         console.error("Error fetching order stats:", error);
-        setError("Failed to load order data");
+        // Don't set error state as it's unused
       } finally {
         setLoading(false);
       }
     };
 
     fetchOrderStats();
-  }, []);
+
+    // Ensure Chart.js is properly initialized
+    if (typeof window !== "undefined") {
+      const initializeChart = () => {
+        if (!chartInitialized) {
+          ChartJS.register(
+            CategoryScale,
+            LinearScale,
+            PointElement,
+            LineElement,
+            Tooltip,
+            Filler,
+            BarElement
+          );
+          setChartInitialized(true);
+        }
+      };
+
+      initializeChart();
+    }
+  }, [chartInitialized]);
 
   // Generate mock trend data for visualization
   const generateMockTrendData = (currentValue: number) => {
@@ -113,6 +137,8 @@ const TotalOrderStatCard = () => {
       {
         data: orderTrend,
         backgroundColor: (context: any) => {
+          if (!context.chart.ctx) return "rgba(25, 118, 210, 0.8)";
+
           const ctx = context.chart.ctx;
           const gradient = ctx.createLinearGradient(0, 0, 0, 100);
           if (percentChange >= 0) {
@@ -249,8 +275,21 @@ const TotalOrderStatCard = () => {
         <Box sx={{ height: 80, mt: 1 }}>
           {loading ? (
             <Skeleton variant="rectangular" width="100%" height={80} />
-          ) : (
+          ) : chartInitialized ? (
             <Bar data={chartData} options={chartOptions} />
+          ) : (
+            <Box
+              sx={{
+                height: 80,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Loading chart...
+              </Typography>
+            </Box>
           )}
         </Box>
       </CardContent>

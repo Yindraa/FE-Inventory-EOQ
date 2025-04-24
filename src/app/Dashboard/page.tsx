@@ -18,7 +18,14 @@ import TotalCustomerStatCard from "../components/TotalCustomerStatCard";
 import OrderReportStatCard from "../components/OrderReportStatCard";
 import RecentOrder from "../components/RecentOrder";
 import LeftSidebar from "../components/LeftSidebar";
-import RightSidebar from "../components/RightSidebar";
+import axios from "axios"; // Added axios import
+
+// Define interface for user profile data
+interface UserProfile {
+  id: string;
+  email: string;
+  username: string;
+}
 
 export default function Dashboard() {
   const theme = useTheme();
@@ -29,67 +36,146 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMounted, setIsMounted] = useState<boolean>(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-    // Try to get username from localStorage or cookies
-    const fetchUsername = () => {
-      setIsLoading(true);
-      try {
-        // Try multiple sources for the username
-        const storedUsername = localStorage.getItem("username");
-        const storedEmail = localStorage.getItem("email");
+  // Fallback method to get username from localStorage or token
+  const fallbackUsernameRetrieval = () => {
+    try {
+      console.log("Using fallback username retrieval");
 
-        // Get username from token if available
-        const token = localStorage.getItem("token");
-        let tokenUsername = null;
+      // Try multiple sources for the username
+      const storedUsername = localStorage.getItem("username");
+      const storedEmail = localStorage.getItem("email");
 
-        if (token) {
-          try {
-            // Simple JWT parsing (assuming JWT format)
-            const base64Url = token.split(".")[1];
-            if (base64Url) {
-              const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-              const jsonPayload = decodeURIComponent(
-                atob(base64)
-                  .split("")
-                  .map(
-                    (c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)
-                  )
-                  .join("")
-              );
+      console.log("Stored username:", storedUsername);
+      console.log("Stored email:", storedEmail);
 
-              const payload = JSON.parse(jsonPayload);
-              if (payload.username) {
-                tokenUsername = payload.username;
-              }
+      // Get username from token if available
+      const token = localStorage.getItem("token");
+      let tokenUsername = null;
+
+      if (token) {
+        try {
+          // Simple JWT parsing (assuming JWT format)
+          const base64Url = token.split(".")[1];
+          if (base64Url) {
+            const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+            const jsonPayload = decodeURIComponent(
+              atob(base64)
+                .split("")
+                .map(
+                  (c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)
+                )
+                .join("")
+            );
+
+            const payload = JSON.parse(jsonPayload);
+            console.log("Token payload:", payload);
+
+            // Check for username in different possible fields
+            if (payload.username) {
+              tokenUsername = payload.username;
+              console.log("Username from token:", tokenUsername);
+            } else if (payload.name) {
+              tokenUsername = payload.name;
+              console.log("Name from token:", tokenUsername);
+            } else if (payload.sub) {
+              tokenUsername = payload.sub;
+              console.log("Subject from token:", tokenUsername);
+            } else if (payload.email) {
+              tokenUsername = payload.email.split("@")[0];
+              console.log("Email-derived username from token:", tokenUsername);
             }
-          } catch (e) {
-            console.error("Error parsing token:", e);
           }
+        } catch (e) {
+          console.error("Error parsing token:", e);
         }
+      }
 
-        // Use the first available username source
-        const finalUsername =
-          storedUsername ||
-          tokenUsername ||
-          (storedEmail ? storedEmail.split("@")[0] : null) ||
-          "User";
+      // Use the first available username source
+      const finalUsername =
+        storedUsername ||
+        tokenUsername ||
+        (storedEmail ? storedEmail.split("@")[0] : null) ||
+        "User";
+
+      console.log("Final username from fallback:", finalUsername);
+
+      // Store it for consistency across components
+      if (finalUsername !== "User") {
+        localStorage.setItem("username", finalUsername);
+      }
+
+      setUsername(finalUsername);
+    } catch (error) {
+      console.error("Error in fallback username retrieval:", error);
+      setUsername("User");
+    }
+  };
+
+  // Fetch user profile from API
+  const fetchUserProfile = async () => {
+    setIsLoading(true);
+    try {
+      // Get the token from localStorage
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        console.log("No authentication token found, using fallback method");
+        fallbackUsernameRetrieval();
+        return;
+      }
+
+      console.log("Token found, making API request");
+
+      // Make the API request with the token in the Authorization header
+      const response = await axios.get(
+        "https://backend-eoq-production.up.railway.app/profile",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          // Add timeout to prevent hanging requests
+          timeout: 5000,
+        }
+      );
+
+      console.log("Profile data successfully fetched:", response.data);
+
+      // Set username from profile data
+      if (response.data && response.data.username) {
+        console.log("Setting username from API:", response.data.username);
+        setUsername(response.data.username);
 
         // Store it for consistency across components
-        if (finalUsername !== "User") {
-          localStorage.setItem("username", finalUsername);
+        localStorage.setItem("username", response.data.username);
+
+        // Also store email if available
+        if (response.data.email) {
+          localStorage.setItem("email", response.data.email);
         }
-
-        setUsername(finalUsername);
-      } catch (error) {
-        console.error("Error fetching username:", error);
-        setUsername("User");
-      } finally {
-        setIsLoading(false);
+      } else {
+        console.log("API response doesn't contain username, using fallback");
+        fallbackUsernameRetrieval();
       }
-    };
+    } catch (err) {
+      console.error("Failed to fetch user profile:", err);
+      fallbackUsernameRetrieval();
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchUsername();
+  useEffect(() => {
+    setIsMounted(true);
+
+    // Check if username is already in localStorage first
+    const storedUsername = localStorage.getItem("username");
+    if (storedUsername && storedUsername !== "User") {
+      console.log("Username found in localStorage:", storedUsername);
+      setUsername(storedUsername);
+      setIsLoading(false);
+    } else {
+      fetchUserProfile();
+    }
   }, []);
 
   if (!isMounted) {
@@ -161,7 +247,7 @@ export default function Dashboard() {
             spacing={isSmallScreen ? 2 : 3}
             sx={{ mb: isSmallScreen ? 2 : 4 }}
           >
-            {/* Baris Pertama (2 card atas) */}
+            {/* First Row (2 cards on top) */}
             <Grid container item xs={12} spacing={isSmallScreen ? 2 : 3}>
               <Grid item xs={12} sm={6} md={6} lg={6}>
                 <InventoryStatCard />
@@ -171,7 +257,7 @@ export default function Dashboard() {
               </Grid>
             </Grid>
 
-            {/* Baris Kedua (2 card bawah) */}
+            {/* Second Row (2 cards on bottom) */}
             <Grid container item xs={12} spacing={isSmallScreen ? 2 : 3}>
               <Grid item xs={12} sm={6} md={6} lg={6}>
                 <TotalCustomerStatCard />
@@ -190,10 +276,6 @@ export default function Dashboard() {
           </Card>
         </Box>
       </Box>
-
-      {/* Right Sidebar - Hidden on mobile and tablet, shown as drawer */}
-      {!isMobile && !isTablet && <RightSidebar />}
-      {(isMobile || isTablet) && <RightSidebar />}
     </Box>
   );
 }

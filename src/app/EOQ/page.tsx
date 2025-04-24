@@ -37,7 +37,6 @@ interface InputFieldProps {
 const EOQCalculator = () => {
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
-  const isMediumScreen = useMediaQuery(theme.breakpoints.between("sm", "md"));
 
   const [demand, setDemand] = useState("");
   const [orderingCost, setOrderingCost] = useState("");

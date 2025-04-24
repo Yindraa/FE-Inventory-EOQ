@@ -42,6 +42,7 @@ const OrderReportStatCard = () => {
     offline: 0,
     other: 0,
   });
+  const [chartInitialized, setChartInitialized] = useState<boolean>(false);
 
   const handleTimeFilterChange = (
     event: React.MouseEvent<HTMLElement>,
@@ -89,12 +90,25 @@ const OrderReportStatCard = () => {
       setPercentChange(mockChange);
       setCategoryData(mockCategories);
       setLoading(false);
+      setChartInitialized(true);
     }, 800);
   };
 
   useEffect(() => {
     fetchRevenueData(timeFilter);
-  }, [timeFilter]);
+
+    // Ensure Chart.js is properly initialized
+    if (typeof window !== "undefined") {
+      const initializeChart = () => {
+        if (!chartInitialized) {
+          ChartJS.register(ArcElement, Tooltip, Legend);
+          setChartInitialized(true);
+        }
+      };
+
+      initializeChart();
+    }
+  }, [timeFilter, chartInitialized]);
 
   // Chart data and options with proper typing
   const chartData: ChartData<"doughnut"> = {
@@ -297,8 +311,21 @@ const OrderReportStatCard = () => {
         >
           {loading ? (
             <Skeleton variant="circular" width={140} height={140} />
-          ) : (
+          ) : chartInitialized ? (
             <Doughnut data={chartData} options={chartOptions} />
+          ) : (
+            <Box
+              sx={{
+                height: 140,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Loading chart...
+              </Typography>
+            </Box>
           )}
         </Box>
 

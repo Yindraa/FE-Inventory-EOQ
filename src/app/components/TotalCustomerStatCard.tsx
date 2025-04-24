@@ -33,6 +33,7 @@ const TotalCustomerStatCard = () => {
   const [newCustomers, setNewCustomers] = useState<number | null>(null);
   const [percentChange, setPercentChange] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
+  const [chartInitialized, setChartInitialized] = useState<boolean>(false);
 
   useEffect(() => {
     // Simulate API call
@@ -52,6 +53,7 @@ const TotalCustomerStatCard = () => {
           setNewCustomers(mockNew);
           setPercentChange(mockChange);
           setLoading(false);
+          setChartInitialized(true);
         }, 1000);
       } catch (error) {
         console.error("Error fetching customer stats:", error);
@@ -60,7 +62,19 @@ const TotalCustomerStatCard = () => {
     };
 
     fetchCustomerStats();
-  }, []);
+
+    // Ensure Chart.js is properly initialized
+    if (typeof window !== "undefined") {
+      const initializeChart = () => {
+        if (!chartInitialized) {
+          ChartJS.register(ArcElement, Tooltip, Legend);
+          setChartInitialized(true);
+        }
+      };
+
+      initializeChart();
+    }
+  }, [chartInitialized]);
 
   const loyalCustomers =
     totalCustomers !== null && newCustomers !== null
@@ -205,7 +219,7 @@ const TotalCustomerStatCard = () => {
         >
           {loading ? (
             <Skeleton variant="circular" width={120} height={120} />
-          ) : (
+          ) : chartInitialized ? (
             <>
               <Box
                 sx={{
@@ -228,6 +242,19 @@ const TotalCustomerStatCard = () => {
               </Box>
               <Doughnut data={chartData} options={chartOptions} />
             </>
+          ) : (
+            <Box
+              sx={{
+                height: 120,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Loading chart...
+              </Typography>
+            </Box>
           )}
         </Box>
 
